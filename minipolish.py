@@ -56,16 +56,73 @@ def get_arguments(args):
 
 def main(args=None):
     args = get_arguments(args)
+    # TODO: check for Racon
     random.seed(0)
-
     graph = load_gfa(args.assembly)
-
-    # TODO: an initial round where contigs are only polished with their constituent reads.
-
+    initial_polish(graph, args.reads)
     # TODO: full rounds of polishing where all reads are used to polish the assembly.
-
+    # TODO: assign depths to each segment
+    # TODO: redo the link overlaps
     # TODO: output the polished GFA to stdout.
 
+
+def initial_polish(graph, read_filename):
+    # This first round of polishing is done on a per-segment basis and only uses reads which are
+    # definitely associated with the segment (because the GFA indicated that they were used to
+    # make the segment).
+    print_stderr('Initial polishing round')
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_dir = pathlib.Path(tmp_dir)
+        # tmp_dir = pathlib.Path('/Users/ryan/Desktop/test')  # TEMP!
+        save_per_segment_reads(graph, read_filename, tmp_dir)
+        for segment in graph.segments.values():
+            seg_read_filename = tmp_dir / (segment.name + '.fastq')
+            seg_seq_filename = tmp_dir / (segment.name + '.fasta')
+            segment.save_to_fasta(seg_seq_filename)
+            polished_seq_filename = tmp_dir / (segment.name + '_polished.fasta')
+            if run_racon(segment.name, seg_read_filename, seg_seq_filename, polished_seq_filename):
+                # TODO: change the segment sequence to the polished sequence
+                pass
+
+    print_stderr('')
+
+
+def save_per_segment_reads(graph, read_filename, tmp_dir):
+    read_to_segment = collections.defaultdict(list)
+    for segment in graph.segments.values():
+        for read_name in segment.read_names:
+            read_to_segment[read_name].append(segment.name)
+    for read_name, seq, qual in iterate_fastq(read_filename):
+        if read_name not in read_to_segment:
+            continue
+        for seg_name in read_to_segment[read_name]:
+            seg_read_filename = tmp_dir / (seg_name + '.fastq')
+            with open(seg_read_filename, 'at') as seg_read_file:
+                seg_read_file.write(f'@{read_name}\n{seq}\n+\n{qual}\n')
+
+
+def run_racon(name, read_filename, seq_filename, polished_filename):
+    if name is None:
+        name = seq_filename
+    read_count = count_reads(read_filename)
+    if read_count <= 1:
+        print_stderr(f'  skipping Racon for {name} (not enough reads)')
+        return False
+
+    print_stderr(f'  running Racon on {name}:')
+    print_stderr(f'    input: {seq_filename}')
+    print_stderr(f'    reads: {read_filename} ({read_count})')
+    print_stderr(f'    output: {polished_filename}')
+
+    # TODO
+    # TODO
+    # TODO
+    # TODO
+    # TODO
+    # TODO
+    # TODO
+    return True
 
 
 class AssemblyGraph(object):
@@ -83,6 +140,10 @@ class Segment(object):
         self.depth = 0.0
         self.read_names = []
 
+    def save_to_fasta(self, filename):
+        with open(filename, 'wt') as fasta:
+            fasta.write(f'>{self.name}\n{self.sequence}\n')
+
 
 class Link(object):
     def __init__(self, gfa_line):
@@ -96,7 +157,7 @@ class Link(object):
 
 
 def load_gfa(filename):
-    print_stderr(f'Loading {filename}')
+    print_stderr(f'\nLoading {filename}')
     graph = AssemblyGraph()
 
     # The constituent reads for segments (GFA 'a' lines) will be stored in this dictionary and
@@ -128,6 +189,7 @@ def load_gfa(filename):
     link_count = len(graph.links)
     print_stderr(f'  {seg_count:,} segments ({base_count:,} bp)')
     print_stderr(f'  {link_count:,} links')
+    print_stderr('')
     return graph
 
 
@@ -170,20 +232,51 @@ def get_open_func(filename):
         return open
 
 
+def get_sequence_file_type(filename):
+    """
+    Determines whether a file is FASTA or FASTQ.
+    """
+    if not os.path.isfile(filename):
+        sys.exit('Error: could not find {}'.format(filename))
+    if get_compression_type(filename) == 'gz':
+        open_func = gzip.open
+    else:  # plain text
+        open_func = open
+    with open_func(filename, 'rt') as seq_file:
+        try:
+            first_char = seq_file.read(1)
+        except UnicodeDecodeError:
+            first_char = ''
+    if first_char == '>':
+        return 'FASTA'
+    elif first_char == '@':
+        return 'FASTQ'
+    else:
+        raise ValueError('File is neither FASTA or FASTQ')
 
 
+def iterate_fastq(filename):
+    if get_sequence_file_type(filename) != 'FASTQ':
+        sys.exit('Error: {} is not FASTQ format'.format(filename))
+    with get_open_func(filename)(filename, 'rt') as fastq:
+        for line in fastq:
+            line = line.strip()
+            if len(line) == 0:
+                continue
+            if not line.startswith('@'):
+                continue
+            name = line[1:].split()[0]
+            sequence = next(fastq).strip()
+            _ = next(fastq)
+            qualities = next(fastq).strip()
+            yield name, sequence, qualities
 
 
-
-
-
-
-
-
-
-
-
-
+def count_reads(filename):
+    count = 0
+    for _ in iterate_fastq(filename):
+        count += 1
+    return count
 
 
 END_FORMATTING = '\033[0m'
