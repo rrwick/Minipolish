@@ -57,24 +57,86 @@ def get_arguments(args):
 def main(args=None):
     args = get_arguments(args)
     random.seed(0)
-    
-    # Load reads into memory
 
-    # Do an initial round where contigs are only polished with their constituent reads.
+    graph = load_gfa(args.assembly)
 
-    # Do full rounds of polishing where all reads are used to polish the assembly.
+    # TODO: an initial round where contigs are only polished with their constituent reads.
 
-    # Output the polished GFA to stdout.
+    # TODO: full rounds of polishing where all reads are used to polish the assembly.
 
-
+    # TODO: output the polished GFA to stdout.
 
 
 
+class AssemblyGraph(object):
+    def __init__(self):
+        self.segments = {}  # dictionary of segment name -> segment object
+        self.links = {}  # dictionary of segment names -> link object
 
 
+class Segment(object):
+    def __init__(self, gfa_line):
+        parts = gfa_line.strip().split('\t')
+        assert parts[0] == 'S'
+        self.name = parts[1]
+        self.sequence = parts[2]
+        self.depth = 0.0
+        self.read_names = []
 
 
+class Link(object):
+    def __init__(self, gfa_line):
+        parts = gfa_line.strip().split('\t')
+        assert parts[0] == 'L'
+        self.name_1 = parts[1]
+        self.strand_1 = parts[2]
+        self.name_2 = parts[3]
+        self.strand_2 = parts[4]
+        self.cigar = parts[5]
 
+
+def load_gfa(filename):
+    print_stderr(f'Loading {filename}')
+    graph = AssemblyGraph()
+
+    # The constituent reads for segments (GFA 'a' lines) will be stored in this dictionary and
+    # then added to the segments at the end of this function. This is so we don't have to assume
+    # that 'a' lines come after their corresponding 'S' line (though I expect they always do).
+    segment_reads = collections.defaultdict(list)
+
+    with get_open_func(filename)(filename) as gfa:
+        for line in gfa:
+            if line.startswith('S\t'):
+                segment = Segment(line)
+                graph.segments[segment.name] = segment
+            if line.startswith('a\t'):
+                segment_name, read_name = parse_a_line(line)
+                segment_reads[segment_name].append(read_name)
+            if line.startswith('L\t'):
+                link = Link(line)
+                names = (link.name_1 + link.strand_1, link.name_2 + link.strand_2)
+                assert names not in graph.links
+                graph.links[names] = link
+
+
+    for segment_name, read_names in segment_reads.items():
+        assert segment_name in graph.segments
+        graph.segments[segment_name].read_names = read_names
+
+    seg_count = len(graph.segments)
+    base_count = sum(len(s.sequence) for s in graph.segments.values())
+    link_count = len(graph.links)
+    print_stderr(f'  {seg_count:,} segments ({base_count:,} bp)')
+    print_stderr(f'  {link_count:,} links')
+    return graph
+
+
+def parse_a_line(line):
+    parts = line.strip().split('\t')
+    assert parts[0] == 'a'
+    segment_name = parts[1]
+    read_name = parts[3].rsplit(':', 1)[0]
+    return segment_name, read_name
 
 
 def get_compression_type(filename):
@@ -106,6 +168,22 @@ def get_open_func(filename):
         return gzip.open
     else:  # plain text
         return open
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 END_FORMATTING = '\033[0m'
@@ -207,6 +285,9 @@ def get_colours_from_tput():
 def get_default_thread_count():
     return min(multiprocessing.cpu_count(), 16)
 
+
+def print_stderr(message, end='\n'):
+    print(message, file=sys.stderr, flush=True, end=end)
 
 if __name__ == '__main__':
     main()
