@@ -18,6 +18,7 @@ see <https://www.gnu.org/licenses/>.
 import argparse
 import collections
 import gzip
+import multiprocessing
 import os
 import pathlib
 import random
@@ -27,6 +28,8 @@ import sys
 import tempfile
 
 __version__ = '0.1.0'
+
+RACON_PATCH_SIZE = 500
 
 
 def get_arguments(args):
@@ -40,6 +43,8 @@ def get_arguments(args):
                                help='Miniasm assembly to be polished (GFA format)')
 
     setting_args = parser.add_argument_group('Settings')
+    setting_args.add_argument('-t', '--threads', type=int, default=get_default_thread_count(),
+                              help='Number of threads to use for alignment and polishing')
     setting_args.add_argument('--rounds', type=int, default=2,
                               help='Number of full Racon polishing rounds')
 
@@ -56,17 +61,17 @@ def get_arguments(args):
 
 def main(args=None):
     args = get_arguments(args)
-    # TODO: check for Racon
+    # TODO: check for Racon and minimap2
     random.seed(0)
     graph = load_gfa(args.assembly)
-    initial_polish(graph, args.reads)
+    initial_polish(graph, args.reads, args.threads)
     # TODO: full rounds of polishing where all reads are used to polish the assembly.
     # TODO: assign depths to each segment
     # TODO: redo the link overlaps
     # TODO: output the polished GFA to stdout.
 
 
-def initial_polish(graph, read_filename):
+def initial_polish(graph, read_filename, threads):
     # This first round of polishing is done on a per-segment basis and only uses reads which are
     # definitely associated with the segment (because the GFA indicated that they were used to
     # make the segment).
@@ -74,14 +79,15 @@ def initial_polish(graph, read_filename):
 
     with tempfile.TemporaryDirectory() as tmp_dir:
         tmp_dir = pathlib.Path(tmp_dir)
-        # tmp_dir = pathlib.Path('/Users/ryan/Desktop/test')  # TEMP!
+        tmp_dir = pathlib.Path('/Users/ryan/Desktop/Minipolish_test/temp_test')  # TEMP
         save_per_segment_reads(graph, read_filename, tmp_dir)
         for segment in graph.segments.values():
             seg_read_filename = tmp_dir / (segment.name + '.fastq')
             seg_seq_filename = tmp_dir / (segment.name + '.fasta')
             segment.save_to_fasta(seg_seq_filename)
             polished_seq_filename = tmp_dir / (segment.name + '_polished.fasta')
-            if run_racon(segment.name, seg_read_filename, seg_seq_filename, polished_seq_filename):
+            if run_racon(segment.name, seg_read_filename, seg_seq_filename, polished_seq_filename,
+                         threads, tmp_dir):
                 # TODO: change the segment sequence to the polished sequence
                 pass
 
@@ -102,7 +108,7 @@ def save_per_segment_reads(graph, read_filename, tmp_dir):
                 seg_read_file.write(f'@{read_name}\n{seq}\n+\n{qual}\n')
 
 
-def run_racon(name, read_filename, seq_filename, polished_filename):
+def run_racon(name, read_filename, seq_filename, polished_filename, threads, tmp_dir):
     if name is None:
         name = seq_filename
     read_count = count_reads(read_filename)
@@ -113,16 +119,47 @@ def run_racon(name, read_filename, seq_filename, polished_filename):
     print_stderr(f'  running Racon on {name}:')
     print_stderr(f'    input: {seq_filename}')
     print_stderr(f'    reads: {read_filename} ({read_count})')
-    print_stderr(f'    output: {polished_filename}')
+    print_stderr(f'    output: {polished_filename}')\
 
-    # TODO
-    # TODO
-    # TODO
-    # TODO
-    # TODO
-    # TODO
-    # TODO
+    # Align with minimap2
+    command = ['minimap2', '-t', str(threads), '-x', 'map-ont', seq_filename, read_filename]
+    alignments = tmp_dir / (name + '.paf')
+    minimap2_log = tmp_dir / (name + '_minimap2.log')
+    with open(alignments, 'wt') as stdout, open(minimap2_log, 'w') as stderr:
+        subprocess.call(command, stdout=stdout, stderr=stderr)
+
+    # Polish with Racon
+    command = ['racon', '-t', str(threads), read_filename, str(alignments), seq_filename]
+    racon_log = tmp_dir / (name + '_racon.log')
+    with open(polished_filename, 'wt') as stdout, open(racon_log, 'w') as stderr:
+        subprocess.call(command, stdout=stdout, stderr=stderr)
+
+    fixed_seq = fix_sequence_ends(seq_filename, polished_filename)
+
+
+
     return True
+
+
+def fix_sequence_ends(before_fasta, after_fasta):
+    """
+    Racon can sometimes drop the ends of sequences when polishing, so this function does some
+    alignments and patches this up when it happens.
+    """
+    before_contigs = load_fasta(before_fasta)
+    assert len(before_contigs) == 1
+    before_seq = before_contigs[0][1]
+
+    after_contigs = load_fasta(after_fasta)
+    assert len(after_contigs) < 2
+    if len(after_contigs) == 0:
+        return None
+    after_seq = after_contigs[0][1]
+
+    before_start = before_seq[:RACON_PATCH_SIZE]
+    before_end = before_seq[-RACON_PATCH_SIZE:]
+    after_start = after_seq[:RACON_PATCH_SIZE]
+    after_end = after_seq[-RACON_PATCH_SIZE:]
 
 
 class AssemblyGraph(object):
@@ -279,6 +316,31 @@ def count_reads(filename):
     return count
 
 
+def load_fasta(fasta_filename):
+    if get_compression_type(fasta_filename) == 'gz':
+        open_func = gzip.open
+    else:  # plain text
+        open_func = open
+    fasta_seqs = []
+    with open_func(fasta_filename, 'rt') as fasta_file:
+        name = ''
+        sequence = []
+        for line in fasta_file:
+            line = line.strip()
+            if not line:
+                continue
+            if line[0] == '>':  # Header line = start of new contig
+                if name:
+                    fasta_seqs.append((name.split()[0], ''.join(sequence), name))
+                    sequence = []
+                name = line[1:]
+            else:
+                sequence.append(line)
+        if name:
+            fasta_seqs.append((name.split()[0], ''.join(sequence), name))
+    return fasta_seqs
+
+
 END_FORMATTING = '\033[0m'
 BOLD = '\033[1m'
 DIM = '\033[2m'
@@ -381,6 +443,7 @@ def get_default_thread_count():
 
 def print_stderr(message, end='\n'):
     print(message, file=sys.stderr, flush=True, end=end)
+
 
 if __name__ == '__main__':
     main()
