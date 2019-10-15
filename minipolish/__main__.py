@@ -16,11 +16,15 @@ import argparse
 import collections
 import pathlib
 import random
+import subprocess
 import tempfile
 
+from .alignment import Alignment
 from .assembly_graph import load_gfa
 from .help_formatter import MyParser, MyHelpFormatter
-from .misc import print_stderr, iterate_fastq, get_default_thread_count
+from .log import log, section_header, explanation
+from .misc import iterate_fastq, get_default_thread_count, count_reads, count_fasta_bases, \
+    weighted_average
 from .racon import run_racon
 
 
@@ -58,36 +62,87 @@ def main(args=None):
     # TODO: check for Racon and minimap2
     random.seed(0)
     graph = load_gfa(args.assembly)
-    initial_polish(graph, args.reads, args.threads)
-    # TODO: full rounds of polishing where all reads are used to polish the assembly.
-    # TODO: assign depths to each segment
-    # TODO: redo the link overlaps
-    # TODO: output the polished GFA to stdout.
-
-
-def initial_polish(graph, read_filename, threads):
-    # This first round of polishing is done on a per-segment basis and only uses reads which are
-    # definitely associated with the segment (because the GFA indicated that they were used to
-    # make the segment).
-    print_stderr('Initial polishing round')
-
     with tempfile.TemporaryDirectory() as tmp_dir:
         tmp_dir = pathlib.Path(tmp_dir)
-        tmp_dir = pathlib.Path('/Users/ryan/Desktop/Minipolish_test/temp_test')  # TEMP
-        save_per_segment_reads(graph, read_filename, tmp_dir)
-        for segment in list(graph.segments.values()):
-            seg_read_filename = tmp_dir / (segment.name + '.fastq')
-            seg_seq_filename = tmp_dir / (segment.name + '.fasta')
-            segment.save_to_fasta(seg_seq_filename)
-            fixed_seqs = run_racon(segment.name, seg_read_filename, seg_seq_filename, threads,
-                                   tmp_dir)
-            fixed_seq = fixed_seqs[segment.name]
-            if len(fixed_seq) > 0:
-                segment.sequence = fixed_seq
-            else:
-                del graph.segments[segment.name]
+        initial_polish(graph, args.reads, args.threads, tmp_dir)
+        if args.rounds > 0:
+            full_polish(graph, args.reads, args.threads, args.rounds, tmp_dir)
+        assign_depths(graph, args.reads, args.threads, tmp_dir)
+    # TODO: redo the link overlaps
+    graph.print_to_stdout()
 
-    print_stderr('')
+
+def initial_polish(graph, read_filename, threads, tmp_dir):
+    section_header('Initial polishing round')
+    explanation('The first round of polishing is done on a per-segment basis and only uses reads '
+                'which are definitely associated with the segment (because the GFA indicated that '
+                'they were used to make the segment).')
+    save_per_segment_reads(graph, read_filename, tmp_dir)
+    for segment in list(graph.segments.values()):
+        seg_read_filename = tmp_dir / (segment.name + '.fastq')
+        seg_seq_filename = tmp_dir / (segment.name + '.fasta')
+        segment.save_to_fasta(seg_seq_filename)
+        fixed_seqs = run_racon(segment.name, seg_read_filename, seg_seq_filename, threads,
+                               tmp_dir)
+        fixed_seq = fixed_seqs[segment.name]
+        if len(fixed_seq) > 0:
+            segment.sequence = fixed_seq
+        else:
+            graph.remove_segment(segment.name)
+            log(f'Removing empty segment: {segment.name}')
+    log()
+
+
+def full_polish(graph, read_filename, threads, rounds, tmp_dir):
+    section_header('Full polishing rounds')
+    explanation('The assembly graph is now polished using all of the reads. Multiple rounds of '
+                'polishing are done, and circular contigs are rotated between rounds.')
+    for i in range(rounds):
+        round_name = f'round_{i+1}'
+        graph.rotate_circular_sequences()
+        unpolished_filename = tmp_dir / (round_name + '.fasta')
+        graph.save_to_fasta(unpolished_filename)
+        fixed_seqs = run_racon(round_name, read_filename, unpolished_filename, threads, tmp_dir)
+        graph.replace_sequences(fixed_seqs)
+    log()
+
+
+def assign_depths(graph, read_filename, threads, tmp_dir):
+    section_header('Assign read depths')
+    explanation('The reads are aligned to the contigs one final time to calculate read depth '
+                'values.')
+    log(f'Aligning reads:')
+    read_count = count_reads(read_filename)
+    log(f'  reads:      {read_filename} ({read_count:,} reads)')
+
+    depth_filename = tmp_dir / 'depths.fasta'
+    graph.save_to_fasta(depth_filename)
+    base_count = count_fasta_bases(depth_filename)
+    log(f'  contigs:    {depth_filename} ({base_count:,} bp)')
+
+    command = ['minimap2', '-t', str(threads), '-x', 'map-ont', depth_filename, read_filename]
+    alignments_filename = tmp_dir / 'depths.paf'
+    minimap2_log = tmp_dir / 'depths_minimap2.log'
+    with open(alignments_filename, 'wt') as stdout, open(minimap2_log, 'w') as stderr:
+        subprocess.call(command, stdout=stdout, stderr=stderr)
+
+    alignments = []
+    with open(alignments_filename, 'rt') as alignments_file:
+        for line in alignments_file:
+            alignments.append(Alignment(line))
+    log(f'  alignments: {alignments_filename} ({len(alignments):,} alignments)')
+
+    depth_per_contig = {name: 0.0 for name in graph.segments.keys()}
+    for a in alignments:
+        depth_per_contig[a.ref_name] += a.get_ref_depth_contribution()
+    graph.set_depths(depth_per_contig)
+
+    segment_names = sorted(graph.segments.keys())
+    depths = [depth_per_contig[n] for n in segment_names]
+    lengths = [graph.get_segment_length(n) for n in segment_names]
+    mean_depth = weighted_average(depths, lengths)
+    log(f'  mean depth: {mean_depth:.3f}x')
+    log()
 
 
 def save_per_segment_reads(graph, read_filename, tmp_dir):
@@ -102,7 +157,6 @@ def save_per_segment_reads(graph, read_filename, tmp_dir):
             seg_read_filename = tmp_dir / (seg_name + '.fastq')
             with open(seg_read_filename, 'at') as seg_read_file:
                 seg_read_file.write(f'@{read_name}\n{seq}\n+\n{qual}\n')
-
 
 
 if __name__ == '__main__':

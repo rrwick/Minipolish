@@ -15,26 +15,26 @@ If not, see <http://www.gnu.org/licenses/>.
 import edlib
 import subprocess
 
-from .misc import print_stderr, count_reads, load_fasta
+from .log import log
+from .misc import count_reads, load_fasta, count_fasta_bases, count_lines
 
 
-RACON_PATCH_SIZE = 200
+RACON_PATCH_SIZE = 250
 
 
 def run_racon(name, read_filename, unpolished_filename, threads, tmp_dir):
-    polished_filename = tmp_dir / (name + '_polished.fasta')
-
     if name is None:
         name = unpolished_filename
     read_count = count_reads(read_filename)
     if read_count <= 1:
-        print_stderr(f'  skipping Racon for {name} (not enough reads)')
-        return False
+        log(f'Skipping Racon for {name} (not enough reads)')
+        return {}
 
-    print_stderr(f'  running Racon on {name}:')
-    print_stderr(f'    input: {unpolished_filename}')
-    print_stderr(f'    reads: {read_filename} ({read_count} reads)')
-    print_stderr(f'    output: {polished_filename}')
+    log(f'Running Racon on {name}:')
+    log(f'  reads:      {read_filename} ({read_count:,} reads)')
+
+    unpolished_base_count = count_fasta_bases(unpolished_filename)
+    log(f'  input:      {unpolished_filename} ({unpolished_base_count:,} bp)')
 
     # Align with minimap2
     command = ['minimap2', '-t', str(threads), '-x', 'map-ont', unpolished_filename, read_filename]
@@ -42,14 +42,23 @@ def run_racon(name, read_filename, unpolished_filename, threads, tmp_dir):
     minimap2_log = tmp_dir / (name + '_minimap2.log')
     with open(alignments, 'wt') as stdout, open(minimap2_log, 'w') as stderr:
         subprocess.call(command, stdout=stdout, stderr=stderr)
+    alignment_count = count_lines(alignments)
+    log(f'  alignments: {alignments} ({alignment_count:,} alignments)')
 
     # Polish with Racon
+    polished_filename = tmp_dir / (name + '_polished.fasta')
     command = ['racon', '-t', str(threads), read_filename, str(alignments), unpolished_filename]
     racon_log = tmp_dir / (name + '_racon.log')
     with open(polished_filename, 'wt') as stdout, open(racon_log, 'w') as stderr:
         subprocess.call(command, stdout=stdout, stderr=stderr)
+    polished_base_count = count_fasta_bases(polished_filename)
+    log(f'  output:     {polished_filename} ({polished_base_count:,} bp)')
 
     fixed_seqs = fix_sequence_ends(unpolished_filename, polished_filename)
+    fixed_base_count = sum(len(seq) for seq in fixed_seqs.values())
+    if fixed_base_count > polished_base_count:
+        log(f'  fix ends:   {polished_base_count:,} bp -> {fixed_base_count:,} bp')
+    log()
     return fixed_seqs
 
 

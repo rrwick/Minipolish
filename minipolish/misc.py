@@ -121,9 +121,26 @@ def load_fasta(fasta_filename):
     return fasta_seqs
 
 
+def count_fasta_bases(fasta_filename):
+    return sum(len(seq) for _, seq in load_fasta(fasta_filename))
+
+
+def count_lines(filename):
+    with open(filename, 'rt') as file_to_count:
+        num_lines = sum(1 for _ in file_to_count)
+    return num_lines
+
+
 def get_default_thread_count():
     return min(multiprocessing.cpu_count(), 16)
 
 
-def print_stderr(message, end='\n'):
-    print(message, file=sys.stderr, flush=True, end=end)
+def weighted_average(nums, weights):
+    """
+    A simple weighted mean of a list of numbers.
+    """
+    weight_sum = sum(weights)
+    if weight_sum == 0.0:
+        weights = [1.0] * len(nums)
+    return sum(num * (weights[i] / weight_sum) for i, num in enumerate(nums))
+

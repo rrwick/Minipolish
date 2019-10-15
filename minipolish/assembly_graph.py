@@ -13,14 +13,66 @@ If not, see <http://www.gnu.org/licenses/>.
 """
 
 import collections
+import random
 
-from .misc import print_stderr, get_open_func
+from .log import log, section_header, explanation
+from .misc import get_open_func
 
 
 class AssemblyGraph(object):
     def __init__(self):
         self.segments = {}  # dictionary of segment name -> segment object
         self.links = {}  # dictionary of segment names -> link object
+
+    def remove_segment(self, seg_name):
+        del self.segments[seg_name]
+        for link_name in list(self.links.keys()):
+            link = self.links[link_name]
+            if link.name_1 == seg_name or link.name_2 == seg_name:
+                self.links.pop(link_name, None)
+
+    def print_to_stdout(self):
+        segment_names = sorted(self.segments.keys())
+        for name in segment_names:
+            self.segments[name].print_gfa_line_to_stdout()
+
+        link_names = sorted(self.links.keys())
+        for name in link_names:
+            self.links[name].print_gfa_line_to_stdout()
+
+    def rotate_circular_sequences(self):
+        segment_names = sorted(self.segments.keys())
+        for name in segment_names:
+            if name.endswith('c'):
+                positive_link = (name + '+', name + '+')
+                negative_link = (name + '-', name + '-')
+                assert positive_link in self.links
+                assert negative_link in self.links
+                assert self.links[positive_link].cigar == '0M'
+                assert self.links[negative_link].cigar == '0M'
+                segment = self.segments[name]
+                if segment.get_length() > 1:
+                    rotation = random.randint(1, segment.get_length() - 1)
+                    segment.rotate(rotation)
+        log()
+
+    def save_to_fasta(self, filename):
+        segment_names = sorted(self.segments.keys())
+        with open(filename, 'wt') as fasta:
+            for name in segment_names:
+                segment = self.segments[name]
+                fasta.write(f'>{name}\n{segment.sequence}\n')
+
+    def replace_sequences(self, new_seqs):
+        for seg_name, new_seq in new_seqs.items():
+            self.segments[seg_name].sequence = new_seq
+
+    def set_depths(self, depth_per_contig):
+        for seg_name, depth in depth_per_contig.items():
+            self.segments[seg_name].depth = depth
+
+    def get_segment_length(self, seg_name):
+        return self.segments[seg_name].get_length()
 
 
 class Segment(object):
@@ -36,6 +88,17 @@ class Segment(object):
         with open(filename, 'wt') as fasta:
             fasta.write(f'>{self.name}\n{self.sequence}\n')
 
+    def print_gfa_line_to_stdout(self):
+        print(f'S\t{self.name}\t{self.sequence}\tdp:f:{self.depth:.3f}')
+
+    def get_length(self):
+        return len(self.sequence)
+
+    def rotate(self, rotation):
+        assert self.name.endswith('c')  # Only circular contigs should be rotated
+        log(f'Rotating {self.name} by {rotation:,} bp')
+        self.sequence = self.sequence[rotation:] + self.sequence[:rotation]
+
 
 class Link(object):
     def __init__(self, gfa_line):
@@ -47,9 +110,14 @@ class Link(object):
         self.strand_2 = parts[4]
         self.cigar = parts[5]
 
+    def print_gfa_line_to_stdout(self):
+        print(f'L\t{self.name_1}\t{self.strand_1}\t{self.name_2}\t{self.strand_2}\t{self.cigar}')
+
 
 def load_gfa(filename):
-    print_stderr(f'\nLoading {filename}')
+    section_header('Loading graph')
+    explanation('Loading the miniasm GFA graph into memory.')
+    log(filename)
     graph = AssemblyGraph()
 
     # The constituent reads for segments (GFA 'a' lines) will be stored in this dictionary and
@@ -78,9 +146,9 @@ def load_gfa(filename):
     seg_count = len(graph.segments)
     base_count = sum(len(s.sequence) for s in graph.segments.values())
     link_count = len(graph.links)
-    print_stderr(f'  {seg_count:,} segments ({base_count:,} bp)')
-    print_stderr(f'  {link_count:,} links')
-    print_stderr('')
+    log(f'  {seg_count:,} segments ({base_count:,} bp)')
+    log(f'  {link_count:,} links')
+    log()
     return graph
 
 
