@@ -16,17 +16,15 @@ import argparse
 import collections
 import pathlib
 import random
-import subprocess
 import tempfile
 
 from .assembly_graph import load_gfa
 from .help_formatter import MyParser, MyHelpFormatter
-from .misc import print_stderr, count_reads, iterate_fastq, load_fasta, get_default_thread_count
+from .misc import print_stderr, iterate_fastq, get_default_thread_count
+from .racon import run_racon
 
 
 __version__ = '0.1.0'
-
-RACON_PATCH_SIZE = 500
 
 
 def get_arguments(args):
@@ -77,15 +75,17 @@ def initial_polish(graph, read_filename, threads):
         tmp_dir = pathlib.Path(tmp_dir)
         tmp_dir = pathlib.Path('/Users/ryan/Desktop/Minipolish_test/temp_test')  # TEMP
         save_per_segment_reads(graph, read_filename, tmp_dir)
-        for segment in graph.segments.values():
+        for segment in list(graph.segments.values()):
             seg_read_filename = tmp_dir / (segment.name + '.fastq')
             seg_seq_filename = tmp_dir / (segment.name + '.fasta')
             segment.save_to_fasta(seg_seq_filename)
-            polished_seq_filename = tmp_dir / (segment.name + '_polished.fasta')
-            if run_racon(segment.name, seg_read_filename, seg_seq_filename, polished_seq_filename,
-                         threads, tmp_dir):
-                # TODO: change the segment sequence to the polished sequence
-                pass
+            fixed_seqs = run_racon(segment.name, seg_read_filename, seg_seq_filename, threads,
+                                   tmp_dir)
+            fixed_seq = fixed_seqs[segment.name]
+            if len(fixed_seq) > 0:
+                segment.sequence = fixed_seq
+            else:
+                del graph.segments[segment.name]
 
     print_stderr('')
 
@@ -103,59 +103,6 @@ def save_per_segment_reads(graph, read_filename, tmp_dir):
             with open(seg_read_filename, 'at') as seg_read_file:
                 seg_read_file.write(f'@{read_name}\n{seq}\n+\n{qual}\n')
 
-
-def run_racon(name, read_filename, seq_filename, polished_filename, threads, tmp_dir):
-    if name is None:
-        name = seq_filename
-    read_count = count_reads(read_filename)
-    if read_count <= 1:
-        print_stderr(f'  skipping Racon for {name} (not enough reads)')
-        return False
-
-    print_stderr(f'  running Racon on {name}:')
-    print_stderr(f'    input: {seq_filename}')
-    print_stderr(f'    reads: {read_filename} ({read_count})')
-    print_stderr(f'    output: {polished_filename}')\
-
-    # Align with minimap2
-    command = ['minimap2', '-t', str(threads), '-x', 'map-ont', seq_filename, read_filename]
-    alignments = tmp_dir / (name + '.paf')
-    minimap2_log = tmp_dir / (name + '_minimap2.log')
-    with open(alignments, 'wt') as stdout, open(minimap2_log, 'w') as stderr:
-        subprocess.call(command, stdout=stdout, stderr=stderr)
-
-    # Polish with Racon
-    command = ['racon', '-t', str(threads), read_filename, str(alignments), seq_filename]
-    racon_log = tmp_dir / (name + '_racon.log')
-    with open(polished_filename, 'wt') as stdout, open(racon_log, 'w') as stderr:
-        subprocess.call(command, stdout=stdout, stderr=stderr)
-
-    fixed_seq = fix_sequence_ends(seq_filename, polished_filename)
-
-
-
-    return True
-
-
-def fix_sequence_ends(before_fasta, after_fasta):
-    """
-    Racon can sometimes drop the ends of sequences when polishing, so this function does some
-    alignments and patches this up when it happens.
-    """
-    before_contigs = load_fasta(before_fasta)
-    assert len(before_contigs) == 1
-    before_seq = before_contigs[0][1]
-
-    after_contigs = load_fasta(after_fasta)
-    assert len(after_contigs) < 2
-    if len(after_contigs) == 0:
-        return None
-    after_seq = after_contigs[0][1]
-
-    before_start = before_seq[:RACON_PATCH_SIZE]
-    before_end = before_seq[-RACON_PATCH_SIZE:]
-    after_start = after_seq[:RACON_PATCH_SIZE]
-    after_end = after_seq[-RACON_PATCH_SIZE:]
 
 
 if __name__ == '__main__':

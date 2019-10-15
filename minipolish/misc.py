@@ -111,13 +111,13 @@ def load_fasta(fasta_filename):
                 continue
             if line[0] == '>':  # Header line = start of new contig
                 if name:
-                    fasta_seqs.append((name.split()[0], ''.join(sequence), name))
+                    fasta_seqs.append((name.split()[0], ''.join(sequence)))
                     sequence = []
                 name = line[1:]
             else:
                 sequence.append(line)
         if name:
-            fasta_seqs.append((name.split()[0], ''.join(sequence), name))
+            fasta_seqs.append((name.split()[0], ''.join(sequence)))
     return fasta_seqs
 
 
