@@ -22,7 +22,7 @@ from .misc import count_reads, load_fasta, count_fasta_bases, count_lines
 RACON_PATCH_SIZE = 250
 
 
-def run_racon(name, read_filename, unpolished_filename, threads, tmp_dir):
+def run_racon(name, read_filename, unpolished_filename, threads, tmp_dir, pacbio):
     if name is None:
         name = unpolished_filename
     read_count = count_reads(read_filename)
@@ -37,7 +37,8 @@ def run_racon(name, read_filename, unpolished_filename, threads, tmp_dir):
     log(f'  input:      {unpolished_filename} ({unpolished_base_count:,} bp)')
 
     # Align with minimap2
-    command = ['minimap2', '-t', str(threads), '-x', 'map-ont', unpolished_filename, read_filename]
+    preset = 'map-pb' if pacbio else 'map-ont'
+    command = ['minimap2', '-t', str(threads), '-x', preset, unpolished_filename, read_filename]
     alignments = tmp_dir / (name + '.paf')
     minimap2_log = tmp_dir / (name + '_minimap2.log')
     with open(alignments, 'wt') as stdout, open(minimap2_log, 'w') as stderr:

@@ -13,8 +13,8 @@ details. You should have received a copy of the GNU General Public License along
 If not, see <http://www.gnu.org/licenses/>.
 """
 
+import os
 import textwrap
-import shutil
 import sys
 
 
@@ -48,8 +48,18 @@ def explanation(text, indent_size=4):
     stdout but not wrapped for the log file.
     """
     text = ' ' * indent_size + text
-    # TODO: make terminal width work for stderr
-    terminal_width = shutil.get_terminal_size().columns
+    terminal_width, _ = get_terminal_size_stderr()
     for line in textwrap.wrap(text, width=terminal_width - 1):
         log(dim(line))
     log()
+
+
+def get_terminal_size_stderr(fallback=(80, 24)):
+    """
+    Unlike shutil.get_terminal_size, which looks at stdout, this looks at stderr.
+    """
+    try:
+        size = os.get_terminal_size(sys.__stderr__.fileno())
+    except (AttributeError, ValueError, OSError):
+        size = os.terminal_size(fallback)
+    return size

@@ -15,6 +15,8 @@ If not, see <http://www.gnu.org/licenses/>.
 import gzip
 import multiprocessing
 import os
+import shutil
+import subprocess
 import sys
 
 
@@ -143,4 +145,43 @@ def weighted_average(nums, weights):
     if weight_sum == 0.0:
         weights = [1.0] * len(nums)
     return sum(num * (weights[i] / weight_sum) for i, num in enumerate(nums))
+
+
+def racon_path_and_version(racon_path):
+    found_racon_path = shutil.which(racon_path)
+    if found_racon_path is None:
+        return racon_path, '', 'not found'
+    command = [found_racon_path]
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    out, _ = process.communicate()
+    out = out.decode().lower()
+    if 'racon' not in out or 'options' not in out:
+        return found_racon_path, '-', 'bad'
+    return found_racon_path, racon_or_minimap2_version(found_racon_path), 'good'
+
+
+def minimap2_path_and_version(minimap2_path):
+    found_minimap2_path = shutil.which(minimap2_path)
+    if found_minimap2_path is None:
+        return minimap2_path, '', 'not found'
+    command = [found_minimap2_path]
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    out, _ = process.communicate()
+    out = out.decode().lower()
+    if 'minimap2' not in out or 'options' not in out:
+        return found_minimap2_path, '-', 'bad'
+    return found_minimap2_path, racon_or_minimap2_version(found_minimap2_path), 'good'
+
+
+def racon_or_minimap2_version(tool_path):
+    command = [tool_path, '--version']
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    out, _ = process.communicate()
+    out = out.decode().lower().strip()
+    if len(out) == 0 or '.' not in out:
+        return '-'
+    if out.startswith('v'):
+        return out[1:]
+    else:
+        return out
 

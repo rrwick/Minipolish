@@ -17,6 +17,7 @@ import collections
 import pathlib
 import random
 import subprocess
+import sys
 import tempfile
 
 from .alignment import Alignment
@@ -24,11 +25,9 @@ from .assembly_graph import load_gfa
 from .help_formatter import MyParser, MyHelpFormatter
 from .log import log, section_header, explanation
 from .misc import iterate_fastq, get_default_thread_count, count_reads, count_fasta_bases, \
-    weighted_average
+    weighted_average, racon_path_and_version, minimap2_path_and_version
 from .racon import run_racon
-
-
-__version__ = '0.1.0'
+from .version import __version__
 
 
 def get_arguments(args):
@@ -45,6 +44,10 @@ def get_arguments(args):
                               help='Number of threads to use for alignment and polishing')
     setting_args.add_argument('--rounds', type=int, default=2,
                               help='Number of full Racon polishing rounds')
+    setting_args.add_argument('--pacbio', action='store_true',
+                              help='Use this flag for PacBio reads to make Minipolish use the '
+                                   'map-pb Minimap2 preset (default: assumes Nanopore reads and '
+                                   'uses the map-ont preset)')
 
     other_args = parser.add_argument_group('Other')
     other_args.add_argument('-h', '--help', action='help', default=argparse.SUPPRESS,
@@ -64,15 +67,15 @@ def main(args=None):
     graph = load_gfa(args.assembly)
     with tempfile.TemporaryDirectory() as tmp_dir:
         tmp_dir = pathlib.Path(tmp_dir)
-        initial_polish(graph, args.reads, args.threads, tmp_dir)
+        initial_polish(graph, args.reads, args.threads, tmp_dir, args.pacbio)
         if args.rounds > 0:
-            full_polish(graph, args.reads, args.threads, args.rounds, tmp_dir)
-        assign_depths(graph, args.reads, args.threads, tmp_dir)
+            full_polish(graph, args.reads, args.threads, args.rounds, tmp_dir, args.pacbio)
+        assign_depths(graph, args.reads, args.threads, tmp_dir, args.pacbio)
     # TODO (maybe): add a step here to recalculate the overlaps between segments
     graph.print_to_stdout()
 
 
-def initial_polish(graph, read_filename, threads, tmp_dir):
+def initial_polish(graph, read_filename, threads, tmp_dir, pacbio):
     section_header('Initial polishing round')
     explanation('The first round of polishing is done on a per-segment basis and only uses reads '
                 'which are definitely associated with the segment (because the GFA indicated that '
@@ -83,7 +86,7 @@ def initial_polish(graph, read_filename, threads, tmp_dir):
         seg_seq_filename = tmp_dir / (segment.name + '.fasta')
         segment.save_to_fasta(seg_seq_filename)
         fixed_seqs = run_racon(segment.name, seg_read_filename, seg_seq_filename, threads,
-                               tmp_dir)
+                               tmp_dir, pacbio)
         fixed_seq = fixed_seqs[segment.name]
         if len(fixed_seq) > 0:
             segment.sequence = fixed_seq
@@ -93,7 +96,7 @@ def initial_polish(graph, read_filename, threads, tmp_dir):
     log()
 
 
-def full_polish(graph, read_filename, threads, rounds, tmp_dir):
+def full_polish(graph, read_filename, threads, rounds, tmp_dir, pacbio):
     section_header('Full polishing rounds')
     explanation('The assembly graph is now polished using all of the reads. Multiple rounds of '
                 'polishing are done, and circular contigs are rotated between rounds.')
@@ -102,11 +105,12 @@ def full_polish(graph, read_filename, threads, rounds, tmp_dir):
         graph.rotate_circular_sequences()
         unpolished_filename = tmp_dir / (round_name + '.fasta')
         graph.save_to_fasta(unpolished_filename)
-        fixed_seqs = run_racon(round_name, read_filename, unpolished_filename, threads, tmp_dir)
+        fixed_seqs = run_racon(round_name, read_filename, unpolished_filename, threads, tmp_dir,
+                               pacbio)
         graph.replace_sequences(fixed_seqs)
 
 
-def assign_depths(graph, read_filename, threads, tmp_dir):
+def assign_depths(graph, read_filename, threads, tmp_dir, pacbio):
     section_header('Assign read depths')
     explanation('The reads are aligned to the contigs one final time to calculate read depth '
                 'values.')
@@ -119,7 +123,8 @@ def assign_depths(graph, read_filename, threads, tmp_dir):
     base_count = count_fasta_bases(depth_filename)
     log(f'  contigs:    {depth_filename} ({base_count:,} bp)')
 
-    command = ['minimap2', '-t', str(threads), '-x', 'map-ont', depth_filename, read_filename]
+    preset = 'map-pb' if pacbio else 'map-ont'
+    command = ['minimap2', '-t', str(threads), '-x', preset, depth_filename, read_filename]
     alignments_filename = tmp_dir / 'depths.paf'
     minimap2_log = tmp_dir / 'depths_minimap2.log'
     with open(alignments_filename, 'wt') as stdout, open(minimap2_log, 'w') as stderr:
@@ -159,8 +164,27 @@ def save_per_segment_reads(graph, read_filename, tmp_dir):
 
 
 def check_for_required_tools():
-    pass
-    # TODO: check for Racon and minimap2
+    section_header('Checking requirements')
+    explanation('Minipolish requires Minimap2 and Racon to run, so it checks for these tools now.')
+
+    minimap2_path, minimap2_version, minimap2_status = minimap2_path_and_version('minimap2')
+    if minimap2_status == 'good':
+        log(f'Minimap2 found: {minimap2_path} (v{minimap2_version})')
+    elif minimap2_status == 'not found':
+        sys.exit('Error: minimap2 not found - make sure it is in your PATH before running '
+                 'Minipolish')
+    elif minimap2_status == 'bad':
+        sys.exit('Error: unable to determine minimap2 version')
+
+    racon_path, racon_version, racon_status = racon_path_and_version('racon')
+    if racon_status == 'good':
+        log(f'Racon found:    {racon_path} (v{racon_version})')
+    elif racon_status == 'not found':
+        sys.exit('Error: racon not found - make sure it is in your PATH before running Minipolish')
+    elif racon_status == 'bad':
+        sys.exit('Error: unable to determine Racon version')
+
+    log()
 
 
 if __name__ == '__main__':
