@@ -59,7 +59,7 @@ def get_arguments(args):
 
 def main(args=None):
     args = get_arguments(args)
-    # TODO: check for Racon and minimap2
+    check_for_required_tools()
     random.seed(0)
     graph = load_gfa(args.assembly)
     with tempfile.TemporaryDirectory() as tmp_dir:
@@ -68,7 +68,7 @@ def main(args=None):
         if args.rounds > 0:
             full_polish(graph, args.reads, args.threads, args.rounds, tmp_dir)
         assign_depths(graph, args.reads, args.threads, tmp_dir)
-    # TODO: redo the link overlaps
+    # TODO (maybe): add a step here to recalculate the overlaps between segments
     graph.print_to_stdout()
 
 
@@ -104,7 +104,6 @@ def full_polish(graph, read_filename, threads, rounds, tmp_dir):
         graph.save_to_fasta(unpolished_filename)
         fixed_seqs = run_racon(round_name, read_filename, unpolished_filename, threads, tmp_dir)
         graph.replace_sequences(fixed_seqs)
-    log()
 
 
 def assign_depths(graph, read_filename, threads, tmp_dir):
@@ -157,6 +156,11 @@ def save_per_segment_reads(graph, read_filename, tmp_dir):
             seg_read_filename = tmp_dir / (seg_name + '.fastq')
             with open(seg_read_filename, 'at') as seg_read_file:
                 seg_read_file.write(f'@{read_name}\n{seq}\n+\n{qual}\n')
+
+
+def check_for_required_tools():
+    pass
+    # TODO: check for Racon and minimap2
 
 
 if __name__ == '__main__':

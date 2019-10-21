@@ -14,6 +14,7 @@ If not, see <http://www.gnu.org/licenses/>.
 
 import collections
 import random
+import sys
 
 from .log import log, section_header, explanation
 from .misc import get_open_func
@@ -23,6 +24,11 @@ class AssemblyGraph(object):
     def __init__(self):
         self.segments = {}  # dictionary of segment name -> segment object
         self.links = {}  # dictionary of segment names -> link object
+
+    def add_link(self, link):
+        names = (link.name_1 + link.strand_1, link.name_2 + link.strand_2)
+        assert names not in self.links
+        self.links[names] = link
 
     def remove_segment(self, seg_name):
         del self.segments[seg_name]
@@ -74,6 +80,48 @@ class AssemblyGraph(object):
     def get_segment_length(self, seg_name):
         return self.segments[seg_name].get_length()
 
+    def build_reverse_links(self):
+        """
+        Each link in the graph (e.g. utg000001l+ -> utg000002l-) should have a corresponding link
+        in the other direction (utg000002l+ -> utg000001l-). This function
+        """
+        # Group links into their pairs.
+        str_to_links = collections.defaultdict(list)
+        for link in self.links.values():
+            str_to_links[link.get_canonical_link_str()].append(link)
+
+        # For each pair, make the other link if it doesn't already exist.
+        for link_str, links in str_to_links.items():
+            assert len(links) == 1 or len(links) == 2
+            if len(links) == 1:
+                self.add_link(make_reverse_link(links[0]))
+
+        # Sanity check: all links should be paired now.
+        str_to_links = collections.defaultdict(list)
+        for link in self.links.values():
+            str_to_links[link.get_canonical_link_str()].append(link)
+        for links in str_to_links.values():
+            assert len(links) == 2
+
+    def build_circularising_links(self):
+        """
+        Any circular contig (i.e. ends with 'c') should have a circularising link with no overlap
+        (e.g. utg000001c+ -> utg000001c+ 0M). This function will build those links (in both
+        directions if they don't already exist.
+        """
+        segment_names = sorted(self.segments.keys())
+        for name in segment_names:
+            if name.endswith('c'):
+                link_names_forward = (name + '+', name + '+')
+                link_names_reverse = (name + '-', name + '-')
+                if link_names_forward not in self.links:
+                    # This function assumes that build_reverse_links has already been run, so if
+                    # the forward link is missing, the reverse link should be too.
+                    assert link_names_reverse not in self.links
+                    new_link = Link(f'L\t{name}\t+\t{name}\t+\t0M')
+                    self.add_link(new_link)
+                    self.add_link(make_reverse_link(new_link))
+
 
 class Segment(object):
     def __init__(self, gfa_line):
@@ -113,6 +161,33 @@ class Link(object):
     def print_gfa_line_to_stdout(self):
         print(f'L\t{self.name_1}\t{self.strand_1}\t{self.name_2}\t{self.strand_2}\t{self.cigar}')
 
+    def get_forward_link_str(self):
+        return self.name_1 + self.strand_1 + self.name_2 + self.strand_2
+
+    def get_reverse_link_str(self):
+        return self.name_2 + flip_strand(self.strand_2) + self.name_1 + flip_strand(self.strand_1)
+
+    def get_canonical_link_str(self):
+        """
+        Returns a string describing the link in a consistent direction. I.e. each link in a pair
+        should return the same string from this function.
+        """
+        if self.strand_1 == '+' and self.strand_2 == '+':
+            return self.get_forward_link_str()
+        elif self.strand_1 == '-' and self.strand_2 == '-':
+            return self.get_reverse_link_str()
+        elif self.name_1 < self.name_2:
+            return self.get_forward_link_str()
+        else:
+            return self.get_reverse_link_str()
+
+
+def flip_strand(strand):
+    if strand == '+':
+        return '-'
+    assert strand == '-'
+    return '+'
+
 
 def load_gfa(filename):
     section_header('Loading graph')
@@ -129,15 +204,17 @@ def load_gfa(filename):
         for line in gfa:
             if line.startswith('S\t'):
                 segment = Segment(line)
+                if not (segment.name.endswith('l') or segment.name.endswith('c')):
+                    sys.exit('Error: contig name does not appear to be in a miniasm format')
                 graph.segments[segment.name] = segment
             if line.startswith('a\t'):
                 segment_name, read_name = parse_a_line(line)
                 segment_reads[segment_name].append(read_name)
             if line.startswith('L\t'):
-                link = Link(line)
-                names = (link.name_1 + link.strand_1, link.name_2 + link.strand_2)
-                assert names not in graph.links
-                graph.links[names] = link
+                graph.add_link(Link(line))
+
+    graph.build_reverse_links()
+    graph.build_circularising_links()
 
     for segment_name, read_names in segment_reads.items():
         assert segment_name in graph.segments
@@ -158,3 +235,12 @@ def parse_a_line(line):
     segment_name = parts[1]
     read_name = parts[3].rsplit(':', 1)[0]
     return segment_name, read_name
+
+
+def make_reverse_link(link):
+    """
+    This function returns a Link object which is the reverse direction of the given link object,
+    using the same CIGAR.
+    """
+    return Link(f'L\t{link.name_2}\t{flip_strand(link.strand_2)}\t'
+                f'{link.name_1}\t{flip_strand(link.strand_1)}\t{link.cigar}')

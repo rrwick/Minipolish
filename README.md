@@ -10,9 +10,8 @@ That's where this script comes in. It uses Racon to polish up a miniasm assembly
 
 It also takes care of some of the other nuances of polishing a miniasm assembly:
 * Adding read depth information to contigs
-* Adjusting contig overlaps to account for sequence changes in polishing
-* Fixing sequence truncation that can occur in Racon
-* Adding circularising links to circular contigs (so they display better in [Bandage](https://github.com/rrwick/Bandage))
+* Fixing the sequence truncation that can occur in Racon
+* Adding circularising links to circular contigs if not already present (so they display better in [Bandage](https://github.com/rrwick/Bandage))
 * 'Rotating' circular contigs between polishing rounds to ensure clean circularisation
 
 
