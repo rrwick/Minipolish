@@ -96,6 +96,7 @@ def initial_polish(graph, read_filename, threads, tmp_dir, pacbio):
         else:
             graph.remove_segment(segment.name)
             log(f'Removing empty segment: {segment.name}')
+            log()
     log()
 
 
