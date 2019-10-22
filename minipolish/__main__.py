@@ -89,7 +89,7 @@ def initial_polish(graph, read_filename, threads, tmp_dir, pacbio):
                                tmp_dir, pacbio)
         try:
             fixed_seq = fixed_seqs[segment.name]
-        except IndexError:
+        except KeyError:
             fixed_seq = ''
         if len(fixed_seq) > 0:
             segment.sequence = fixed_seq

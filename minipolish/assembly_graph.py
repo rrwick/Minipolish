@@ -72,7 +72,7 @@ class AssemblyGraph(object):
         for seg_name, new_seq in new_seqs.items():
             try:
                 self.segments[seg_name].sequence = new_seq
-            except IndexError:
+            except KeyError:
                 pass
 
     def set_depths(self, depth_per_contig):
