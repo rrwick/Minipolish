@@ -25,6 +25,7 @@ class Alignment(object):
             sys.exit('Error: alignment file does not seem to be in PAF format')
 
         self.read_name = line_parts[0]
+        self.read_length = int(line_parts[1])
         self.read_start = int(line_parts[2])
         self.read_end = int(line_parts[3])
         self.strand = line_parts[4]

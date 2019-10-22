@@ -91,7 +91,7 @@ class AssemblyGraph(object):
             str_to_links[link.get_canonical_link_str()].append(link)
 
         # For each pair, make the other link if it doesn't already exist.
-        for link_str, links in str_to_links.items():
+        for _, links in str_to_links.items():
             assert len(links) == 1 or len(links) == 2
             if len(links) == 1:
                 self.add_link(make_reverse_link(links[0]))
@@ -205,7 +205,8 @@ def load_gfa(filename):
             if line.startswith('S\t'):
                 segment = Segment(line)
                 if not (segment.name.endswith('l') or segment.name.endswith('c')):
-                    sys.exit('Error: contig name does not appear to be in a miniasm format')
+                    sys.exit(f'Error: contig name ({segment.name}) does not appear to be in a '
+                             f'miniasm format')
                 graph.segments[segment.name] = segment
             if line.startswith('a\t'):
                 segment_name, read_name = parse_a_line(line)

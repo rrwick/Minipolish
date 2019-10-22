@@ -144,6 +144,7 @@ def weighted_average(nums, weights):
     weight_sum = sum(weights)
     if weight_sum == 0.0:
         weights = [1.0] * len(nums)
+        weight_sum = sum(weights)
     return sum(num * (weights[i] / weight_sum) for i, num in enumerate(nums))
 
 
