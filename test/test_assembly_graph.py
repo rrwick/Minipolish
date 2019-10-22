@@ -15,6 +15,7 @@ If not, see <http://www.gnu.org/licenses/>.
 """
 
 import pathlib
+import random
 import tempfile
 
 import minipolish.assembly_graph
@@ -123,3 +124,41 @@ def test_load_gfa_4():
     assert len(graph.links) == 2
     assert ('utg000001c+', 'utg000001c+') in graph.links
     assert ('utg000001c-', 'utg000001c-') in graph.links
+
+
+def test_remove_segment():
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        temp_gfa_filename = str(pathlib.Path(tmp_dir) / 'test.gfa')
+        with open(temp_gfa_filename, 'wt') as temp_gfa:
+            temp_gfa.write('S\tutg000001l\tACGTACGACTACGACTG\n')
+            temp_gfa.write('S\tutg000002l\tACGTACGACTACGACTG\n')
+            temp_gfa.write('S\tutg000003l\tACGTACGACTACGACTG\n')
+            temp_gfa.write('L\tutg000001l\t+\tutg000002l\t+\t0M\n')
+            temp_gfa.write('L\tutg000001l\t+\tutg000003l\t+\t0M\n')
+        graph = minipolish.assembly_graph.load_gfa(temp_gfa_filename)
+    assert len(graph.segments) == 3
+    assert len(graph.links) == 4
+    graph.remove_segment('utg000003l')
+    assert len(graph.segments) == 2
+    assert len(graph.links) == 2
+
+
+def test_rotate_circular_sequence():
+    random.seed(0)
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        temp_gfa_filename = str(pathlib.Path(tmp_dir) / 'test.gfa')
+        with open(temp_gfa_filename, 'wt') as temp_gfa:
+            temp_gfa.write('S\tutg000001c\tACGTACGACTACGACTG\n')
+        graph = minipolish.assembly_graph.load_gfa(temp_gfa_filename)
+    before_rotate = graph.segments['utg000001c'].sequence
+    graph.rotate_circular_sequences()
+    after_rotate = graph.segments['utg000001c'].sequence
+    assert before_rotate != after_rotate
+    assert sorted(before_rotate) == sorted(after_rotate)
+
+
+def test_parse_a_line():
+    a_line = 'a\tutg000001c\t0\t1834c7d5-151e-d9af-fe1d-6bd9f68d355e:19-126885\t+\t31415\n'
+    segment_name, read_name = minipolish.assembly_graph.parse_a_line(a_line)
+    assert segment_name == 'utg000001c'
+    assert read_name == '1834c7d5-151e-d9af-fe1d-6bd9f68d355e'

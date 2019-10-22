@@ -41,7 +41,6 @@ class AssemblyGraph(object):
         segment_names = sorted(self.segments.keys())
         for name in segment_names:
             self.segments[name].print_gfa_line_to_stdout()
-
         link_names = sorted(self.links.keys())
         for name in link_names:
             self.links[name].print_gfa_line_to_stdout()
