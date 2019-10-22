@@ -70,7 +70,10 @@ class AssemblyGraph(object):
 
     def replace_sequences(self, new_seqs):
         for seg_name, new_seq in new_seqs.items():
-            self.segments[seg_name].sequence = new_seq
+            try:
+                self.segments[seg_name].sequence = new_seq
+            except IndexError:
+                pass
 
     def set_depths(self, depth_per_contig):
         for seg_name, depth in depth_per_contig.items():

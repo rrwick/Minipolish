@@ -87,7 +87,10 @@ def initial_polish(graph, read_filename, threads, tmp_dir, pacbio):
         segment.save_to_fasta(seg_seq_filename)
         fixed_seqs = run_racon(segment.name, seg_read_filename, seg_seq_filename, threads,
                                tmp_dir, pacbio)
-        fixed_seq = fixed_seqs[segment.name]
+        try:
+            fixed_seq = fixed_seqs[segment.name]
+        except IndexError:
+            fixed_seq = ''
         if len(fixed_seq) > 0:
             segment.sequence = fixed_seq
         else:
