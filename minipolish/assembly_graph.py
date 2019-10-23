@@ -31,11 +31,13 @@ class AssemblyGraph(object):
         self.links[names] = link
 
     def remove_segment(self, seg_name):
+        log(f'Removing empty segment: {seg_name}')
         del self.segments[seg_name]
         for link_name in list(self.links.keys()):
             link = self.links[link_name]
             if link.name_1 == seg_name or link.name_2 == seg_name:
                 self.links.pop(link_name, None)
+        log()
 
     def print_to_stdout(self):
         segment_names = sorted(self.segments.keys())
@@ -70,10 +72,11 @@ class AssemblyGraph(object):
 
     def replace_sequences(self, new_seqs):
         for seg_name, new_seq in new_seqs.items():
-            try:
-                self.segments[seg_name].sequence = new_seq
-            except KeyError:
-                pass
+            if seg_name in self.segments:
+                if len(new_seq) == 0:
+                    self.remove_segment(seg_name)
+                else:
+                    self.segments[seg_name].sequence = new_seq
 
     def set_depths(self, depth_per_contig):
         for seg_name, depth in depth_per_contig.items():
