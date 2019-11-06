@@ -48,6 +48,10 @@ def get_arguments(args):
                               help='Use this flag for PacBio reads to make Minipolish use the '
                                    'map-pb Minimap2 preset (default: assumes Nanopore reads and '
                                    'uses the map-ont preset)')
+    setting_args.add_argument('--skip_initial', action='store_true',
+                              help='Skip the initial polishing round - appropriate if the input '
+                                   'GFA does not have "a" lines (default: do the initial '
+                                   'polishing round')
 
     other_args = parser.add_argument_group('Other')
     other_args.add_argument('-h', '--help', action='help', default=argparse.SUPPRESS,
@@ -67,7 +71,8 @@ def main(args=None):
     graph = load_gfa(args.assembly)
     with tempfile.TemporaryDirectory() as tmp_dir:
         tmp_dir = pathlib.Path(tmp_dir)
-        initial_polish(graph, args.reads, args.threads, tmp_dir, args.pacbio)
+        if not args.skip_initial:
+            initial_polish(graph, args.reads, args.threads, tmp_dir, args.pacbio)
         if args.rounds > 0:
             full_polish(graph, args.reads, args.threads, args.rounds, tmp_dir, args.pacbio)
         assign_depths(graph, args.reads, args.threads, tmp_dir, args.pacbio)
