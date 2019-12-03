@@ -1,13 +1,26 @@
 <p align="center"><img src="images/logo.png" alt="Minipolish" width="600"></p>
 
 
+## Table of contents
+
+* [Introduction](#introduction)
+* [Requirements](#requirements)
+* [Installation](#installation)
+* [Method](#method)
+* [Quick usage](#quick-usage)
+* [Full usage](#full-usage)
+* [License](#license)
+
+
+
+
 ## Introduction
 
 [Miniasm](https://github.com/lh3/miniasm) is a great long-read assembly tool: straight-forward, effective and very fast. However, it does not include a polishing step, so its assemblies have a high error rate – they are essentially made of stitched-together pieces of long reads.
 
 [Racon](https://github.com/isovic/racon) is a great polishing tool that can be used to clean up assembly errors. It's also very fast and well suited for long-read data. However, it operates on FASTA files, not the [GFA graphs](https://github.com/GFA-spec/GFA-spec/blob/master/GFA1.md) that miniasm makes.
 
-That's where this tool comes in. With a single command, Minipolish will use Racon to polish up a miniasm assembly, while keeping the assembly in graph form.
+That's where Minipolish comes in. With a single command, it will use Racon to polish up a miniasm assembly, while keeping the assembly in graph form.
 
 It also takes care of some of the other nuances of polishing a miniasm assembly:
 * Adding read depth information to contigs
@@ -118,8 +131,6 @@ This repo contains a small Bash script (`miniasm_and_minipolish.sh`) to do those
 miniasm_and_minipolish.sh long_reads.fastq.gz 8 > polished.gfa
 ```
 
-
-## Quick usage
 
 
 ## Full usage
