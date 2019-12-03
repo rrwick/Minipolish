@@ -1,4 +1,5 @@
-# Minipolish
+<p align="center"><img src="images/logo.png" alt="Minipolish" width="600"></p>
+
 
 ## Introduction
 
@@ -107,14 +108,14 @@ So take CIGAR overlaps between polished contigs with a grain of salt. They will 
 
 First use minimap2 and miniasm to make an assembly, then polish it with Minipolish:
 ```
-minimap2 -x ava-ont long_reads.fastq.gz long_reads.fastq.gz > overlaps.paf
+minimap2 -t 8 -x ava-ont long_reads.fastq.gz long_reads.fastq.gz > overlaps.paf
 miniasm -f long_reads.fastq.gz overlaps.paf > assembly.gfa
-minipolish long_reads.fastq.gz assembly.gfa > polished.gfa
+minipolish -t 8 long_reads.fastq.gz assembly.gfa > polished.gfa
 ```
 
 This repo contains a small Bash script (`miniasm_and_minipolish.sh`) to do those three steps in a single command. It takes two positional arguments: the long reads file and the number of threads:
 ```
-miniasm_and_minipolish.sh long_reads.fastq.gz 16 > polished.gfa
+miniasm_and_minipolish.sh long_reads.fastq.gz 8 > polished.gfa
 ```
 
 
