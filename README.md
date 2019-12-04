@@ -35,7 +35,7 @@ It also takes care of some of the other nuances of polishing a miniasm assembly:
 
 Minipolish assumes that you have [minimap2](https://github.com/lh3/minimap2) and [Racon](https://github.com/isovic/racon) installed and available in your PATH. If you can run `minimap2 --version` and `racon --version` on the command line, you should be good to go!
 
-The only Python package requirement is [Edlib](https://github.com/Martinsos/edlib/tree/master/bindings/python). If you don't already have this package, it will be installed as part of the Minipolish installation process. You'll also need [pytest](https://docs.pytest.org/en/latest/) if you want to run Minipolish's unit tests.
+You'll need Python 3.6 or later to run Minipolish (check with `python3 --version`). The only Python package requirement is [Edlib](https://github.com/Martinsos/edlib/tree/master/bindings/python). If you don't already have this package, it will be installed as part of the Minipolish installation process. You'll also need [pytest](https://docs.pytest.org/en/latest/) if you want to run Minipolish's unit tests.
 
 
 
