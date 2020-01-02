@@ -9,6 +9,7 @@
 * [Method](#method)
 * [Quick usage](#quick-usage)
 * [Full usage](#full-usage)
+* [Citation](#citation)
 * [License](#license)
 
 
@@ -155,6 +156,14 @@ Other:
   -h, --help                     Show this help message and exit
   --version                      Show program's version number and exit
 ```
+
+
+
+## Citation
+
+If you use Minipolish in your research, you can cite the following paper in which it was introduced:
+
+[Wick RR, Holt KE. Benchmarking of long-read assemblers for prokaryote whole genome sequencing. F1000Research. 2019;8(2138).](https://f1000research.com/articles/8-2138)
 
 
 
