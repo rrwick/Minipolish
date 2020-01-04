@@ -91,12 +91,31 @@ def iterate_fastq(filename):
             yield name, sequence, qualities
 
 
+def iterate_fasta(filename):
+    if get_sequence_file_type(filename) != 'FASTA':
+        sys.exit('Error: {} is not FASTA format'.format(filename))
+    with get_open_func(filename)(filename, 'rt') as fasta:
+        for line in fasta:
+            line = line.strip()
+            if len(line) == 0:
+                continue
+            if not line.startswith('>'):
+                continue
+            name = line[1:].split()[0]
+            sequence = next(fasta).strip()
+            yield name, sequence
+
 def count_reads(filename):
     count = 0
-    for _ in iterate_fastq(filename):
-        count += 1
+    if get_sequence_file_type(filename) == 'FASTA':
+        for _ in iterate_fasta(filename):
+            count += 1
+    elif get_sequence_file_type(filename) == 'FASTQ':
+        for _ in iterate_fastq(filename):
+            count += 1
+    else:
+        sys.exit('Error: {} is not FASTA/FASTQ format'.format(filename))
     return count
-
 
 def load_fasta(fasta_filename):
     if get_compression_type(fasta_filename) == 'gz':
