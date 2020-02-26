@@ -76,10 +76,10 @@ def main(args=None):
     with tempfile.TemporaryDirectory() as tmp_dir:
         tmp_dir = pathlib.Path(tmp_dir)
         if not args.skip_initial:
-            initial_polish(graph, args.reads, args.threads, tmp_dir, args.pacbio)
+            initial_polish(graph, args.reads, args.threads, tmp_dir, args.pacbio, args.pacbio-ccs)
         if args.rounds > 0:
-            full_polish(graph, args.reads, args.threads, args.rounds, tmp_dir, args.pacbio)
-        assign_depths(graph, args.reads, args.threads, tmp_dir, args.pacbio)
+            full_polish(graph, args.reads, args.threads, args.rounds, tmp_dir, args.pacbio, args.pacbio-ccs)
+        assign_depths(graph, args.reads, args.threads, tmp_dir, args.pacbio, args.pacbio)
     # TODO (maybe): add a step here to recalculate the overlaps between segments
     graph.print_to_stdout()
 
