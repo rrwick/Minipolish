@@ -48,6 +48,10 @@ def get_arguments(args):
                               help='Use this flag for PacBio reads to make Minipolish use the '
                                    'map-pb Minimap2 preset (default: assumes Nanopore reads and '
                                    'uses the map-ont preset)')
+    setting_args.add_argument('--pacbio-ccs', action='store_true',
+                              help='Use this flag for PacBio CCS/HiFi reads to make Minipolish use the '
+                                   'asm20 Minimap2 preset (default: assumes Nanopore reads and '
+                                   'uses the map-ont preset)')
     setting_args.add_argument('--skip_initial', action='store_true',
                               help='Skip the initial polishing round - appropriate if the input '
                                    'GFA does not have "a" lines (default: do the initial '
