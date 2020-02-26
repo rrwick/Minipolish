@@ -44,13 +44,12 @@ def get_arguments(args):
                               help='Number of threads to use for alignment and polishing')
     setting_args.add_argument('--rounds', type=int, default=2,
                               help='Number of full Racon polishing rounds')
-    setting_args.add_argument('--pacbio', action='store_true',
-                              help='Use this flag for PacBio reads to make Minipolish use the '
-                                   'map-pb Minimap2 preset (default: assumes Nanopore reads and '
-                                   'uses the map-ont preset)')
-    setting_args.add_argument('--pacbio-ccs', action='store_true',
-                              help='Use this flag for PacBio CCS/HiFi reads to make Minipolish use the '
-                                   'asm20 Minimap2 preset (default: assumes Nanopore reads and '
+    setting_args.add_argument('--pacbio', choices=['clr', 'ccs'],
+                              help='Use --pacbio clr for continuous long PacBio reads to '
+                                   'make Minipolish use the map-pb Minimap2 preset or '
+                                   '--pacbio ccs for asm20 Minimap2 preset for '
+                                   'circular consensus sequence reads '
+                                   '(default: assumes Nanopore reads and '
                                    'uses the map-ont preset)')
     setting_args.add_argument('--skip_initial', action='store_true',
                               help='Skip the initial polishing round - appropriate if the input '
@@ -76,10 +75,10 @@ def main(args=None):
     with tempfile.TemporaryDirectory() as tmp_dir:
         tmp_dir = pathlib.Path(tmp_dir)
         if not args.skip_initial:
-            initial_polish(graph, args.reads, args.threads, tmp_dir, args.pacbio, args.pacbio-ccs)
+            initial_polish(graph, args.reads, args.threads, tmp_dir, args.pacbio)
         if args.rounds > 0:
-            full_polish(graph, args.reads, args.threads, args.rounds, tmp_dir, args.pacbio, args.pacbio-ccs)
-        assign_depths(graph, args.reads, args.threads, tmp_dir, args.pacbio, args.pacbio)
+            full_polish(graph, args.reads, args.threads, args.rounds, tmp_dir, args.pacbio)
+        assign_depths(graph, args.reads, args.threads, tmp_dir, args.pacbio)
     # TODO (maybe): add a step here to recalculate the overlaps between segments
     graph.print_to_stdout()
 
@@ -134,7 +133,7 @@ def assign_depths(graph, read_filename, threads, tmp_dir, pacbio):
     base_count = count_fasta_bases(depth_filename)
     log(f'  contigs:    {depth_filename} ({base_count:,} bp)')
 
-    preset = 'map-pb' if pacbio else 'map-ont'
+    preset = 'map-pb' if pacbio is 'clr' or 'ccs' else 'map-ont'
     command = ['minimap2', '-t', str(threads), '-x', preset, depth_filename, read_filename]
     alignments_filename = tmp_dir / 'depths.paf'
     minimap2_log = tmp_dir / 'depths_minimap2.log'
