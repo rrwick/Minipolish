@@ -149,8 +149,10 @@ Positional arguments:
 Settings:
   -t THREADS, --threads THREADS  Number of threads to use for alignment and polishing (default: 12)
   --rounds ROUNDS                Number of full Racon polishing rounds (default: 2)
-  --pacbio {clr,ccs,no}          Use --pacbio clr for continuous long PacBio reads to make Minipolish use the map-pb Minimap2 preset or
-                                 --pacbio ccs for asm20 Minimap2 preset for circular consensus sequence reads --pacbio no assumes Nanopore
+  --pacbio {clr,ccs,no}          Use --pacbio clr for continuous long PacBio reads to make Minipolish
+                                 use the map-pb Minimap2 preset or
+                                 --pacbio ccs for asm20 Minimap2 preset for circular consensus
+                                 sequence reads --pacbio no assumes Nanopore
                                  reads and uses the map-ont preset)
 
 Other:
