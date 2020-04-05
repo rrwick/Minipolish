@@ -37,7 +37,12 @@ def run_racon(name, read_filename, unpolished_filename, threads, tmp_dir, pacbio
     log(f'  input:      {unpolished_filename} ({unpolished_base_count:,} bp)')
 
     # Align with minimap2
-    preset = 'map-pb' if pacbio is 'clr' else ('asm20' if pacbio is 'ccs' else 'map-ont')
+    if pacbio == 'clr':
+        preset = 'map-pb'
+    elif pacbio == 'ccs':
+        preset = 'asm20'
+    elif pacbio == 'no':
+        preset = 'map-ont' 
     command = ['minimap2', '-t', str(threads), '-x', preset, unpolished_filename, read_filename]
     alignments = tmp_dir / (name + '.paf')
     minimap2_log = tmp_dir / (name + '_minimap2.log')

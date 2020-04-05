@@ -44,12 +44,12 @@ def get_arguments(args):
                               help='Number of threads to use for alignment and polishing')
     setting_args.add_argument('--rounds', type=int, default=2,
                               help='Number of full Racon polishing rounds')
-    setting_args.add_argument('--pacbio', choices=['clr', 'ccs'],
+    setting_args.add_argument('--pacbio', choices=['clr', 'ccs', 'no'],
                               help='Use --pacbio clr for continuous long PacBio reads to '
                                    'make Minipolish use the map-pb Minimap2 preset or '
                                    '--pacbio ccs for asm20 Minimap2 preset for '
                                    'circular consensus sequence reads '
-                                   '(default: assumes Nanopore reads and '
+                                   '--pacbio no assumes Nanopore reads and '
                                    'uses the map-ont preset)')
     setting_args.add_argument('--skip_initial', action='store_true',
                               help='Skip the initial polishing round - appropriate if the input '
@@ -133,7 +133,12 @@ def assign_depths(graph, read_filename, threads, tmp_dir, pacbio):
     base_count = count_fasta_bases(depth_filename)
     log(f'  contigs:    {depth_filename} ({base_count:,} bp)')
 
-    preset = 'map-pb' if pacbio is 'clr' or 'ccs' else 'map-ont'
+    if pacbio == 'clr':
+        preset = 'map-pb'
+    elif pacbio == 'ccs':
+        preset = 'asm20'
+    elif pacbio == 'no':
+        preset = 'map-ont' 
     command = ['minimap2', '-t', str(threads), '-x', preset, depth_filename, read_filename]
     alignments_filename = tmp_dir / 'depths.paf'
     minimap2_log = tmp_dir / 'depths_minimap2.log'
