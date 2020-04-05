@@ -124,13 +124,14 @@ First use minimap2 and miniasm to make an assembly, then polish it with Minipoli
 ```
 minimap2 -t 8 -x ava-ont long_reads.fastq.gz long_reads.fastq.gz > overlaps.paf
 miniasm -f long_reads.fastq.gz overlaps.paf > assembly.gfa
-minipolish -t 8 long_reads.fastq.gz assembly.gfa > polished.gfa
+minipolish --pacbio no -t 8 long_reads.fastq.gz assembly.gfa > polished.gfa
 ```
 
-This repo contains a small Bash script (`miniasm_and_minipolish.sh`) to do those three steps in a single command. It takes two positional arguments: the long reads file and the number of threads:
+This repo contains a small Bash script (`miniasm_and_minipolish.sh`) to do those three steps in a single command. It takes two positional arguments: the long reads file, the number of threads, and overlap/aligner settings (clr, ccs, no):
 ```
-miniasm_and_minipolish.sh long_reads.fastq.gz 8 > polished.gfa
+miniasm_and_minipolish.sh long_reads.fastq.gz 8 no > polished.gfa
 ```
+see `--pacbio` setting below
 
 
 
