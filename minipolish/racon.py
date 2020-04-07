@@ -22,7 +22,8 @@ from .misc import count_reads, load_fasta, count_fasta_bases, count_lines
 RACON_PATCH_SIZE = 250
 
 
-def run_racon(name, read_filename, unpolished_filename, threads, tmp_dir, pacbio):
+def run_racon(name, read_filename, unpolished_filename,
+              threads, tmp_dir, pacbio, aligner):
     if name is None:
         name = unpolished_filename
     read_count = count_reads(read_filename)
@@ -36,21 +37,49 @@ def run_racon(name, read_filename, unpolished_filename, threads, tmp_dir, pacbio
     unpolished_base_count = count_fasta_bases(unpolished_filename)
     log(f'  input:      {unpolished_filename} ({unpolished_base_count:,} bp)')
 
-    # Align with minimap2
+    # Align with minimap2 or winnowmap
     if pacbio == 'clr':
         preset = 'map-pb'
     elif pacbio == 'ccs':
         preset = 'asm20'
-    elif pacbio == 'no':
-        preset = 'map-ont' 
-    command = ['minimap2', '-t', str(threads), '-x', preset, unpolished_filename, read_filename]
-    alignments = tmp_dir / (name + '.paf')
-    minimap2_log = tmp_dir / (name + '_minimap2.log')
-    with open(alignments, 'wt') as stdout, open(minimap2_log, 'w') as stderr:
-        subprocess.call(command, stdout=stdout, stderr=stderr)
-    alignment_count = count_lines(alignments)
-    log(f'  alignments: {alignments} ({alignment_count:,} alignments)')
+    else:
+        preset = 'map-ont'
+    if aligner == 'minimap2':
+        command = ['minimap2', '-t', str(threads), '-x', preset, unpolished_filename, read_filename]
+        alignments = tmp_dir / (name + '.paf')
+        minimap2_log = tmp_dir / (name + '_minimap2.log')
+        with open(alignments, 'wt') as stdout, open(minimap2_log, 'w') as stderr:
+            subprocess.call(command, stdout=stdout, stderr=stderr)
+        alignment_count = count_lines(alignments)
+        log(f'  alignments: {alignments} ({alignment_count:,} alignments)')
+    else:
+        unpolished_filename_meryl = tmp_dir / (name + '.meryl')
+        unpolished_filename_meryl_mers = tmp_dir / (name + '.meryl.mers')
+        if preset == 'map-ont':
+            command_1 = '''meryl count k=15 output %s %s'''%(unpolished_filename_meryl, unpolished_filename)
+            command_2 = '''meryl print greater-than distinct=0.9998 %s > %s'''%(unpolished_filename_meryl, unpolished_filename_meryl_mers)
+            command_3 = ['winnowmap', '-W', unpolished_filename_meryl_mers, '-t', str(threads), '-x', preset, unpolished_filename,
+                         read_filename]
+        else:
+            command_1 = '''meryl count compress k=19 output %s %s'''%(unpolished_filename_meryl, unpolished_filename)
+            command_2 = '''meryl print greater-than distinct=0.9998 %s > %s'''%(unpolished_filename_meryl, unpolished_filename_meryl_mers)
+            command_3 = ['winnowmap', '-W', unpolished_filename_meryl_mers, '-t', str(threads), '-x', preset, unpolished_filename,
+                         read_filename]
 
+        alignments = tmp_dir / (name + '.paf')
+        meryl_count_log = tmp_dir / (name + '_meryl_count.log')
+        with open(meryl_count_log, 'wt') as stdout, open(meryl_count_log, 'w') as stderr:
+            subprocess.call(command_1, stdout=stdout, stderr=stderr, shell=True)
+        meryl_print_log = tmp_dir / (name + '_meryl_print.log')
+        with open(meryl_print_log, 'wt') as stdout, open(meryl_print_log, 'w') as stderr:
+            subprocess.call(command_2, stdout=stdout, stderr=stderr, shell=True)
+        mers_count = count_lines(unpolished_filename_meryl_mers)
+        log(f'  k-mers: {unpolished_filename_meryl_mers} ({mers_count:,} high frequency k-mers)')
+        winnowmap_log = tmp_dir / (name + '_winnowmap.log')
+        with open(alignments, 'wt') as stdout, open(winnowmap_log, 'w') as stderr:
+            subprocess.call(command_3, stdout=stdout, stderr=stderr)
+        alignment_count = count_lines(alignments)
+        log(f'  alignments: {alignments} ({alignment_count:,} alignments)')
     # Polish with Racon
     polished_filename = tmp_dir / (name + '_polished.fasta')
     command = ['racon', '-t', str(threads), read_filename, str(alignments), unpolished_filename]

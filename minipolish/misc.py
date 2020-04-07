@@ -174,6 +174,32 @@ def minimap2_path_and_version(minimap2_path):
     return found_minimap2_path, racon_or_minimap2_version(found_minimap2_path), 'good'
 
 
+def meryl_path_and_version(meryl_path):
+    found_meryl_path = shutil.which(meryl_path)
+    if found_meryl_path is None:
+        return meryl_path, '', 'not found'
+    command = [found_meryl_path]
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    out, _ = process.communicate()
+    out = out.decode().lower()
+    if 'meryl' not in out or 'commands' not in out:
+        return found_meryl_path, '-', 'bad'
+    return found_meryl_path, racon_or_minimap2_version(found_meryl_path), 'good'
+
+
+def winnowmap_path_and_version(winnowmap_path):
+    found_winnowmap_path = shutil.which(winnowmap_path)
+    if found_winnowmap_path is None:
+        return winnowmap_path, '', 'not found'
+    command = [found_winnowmap_path]
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    out, _ = process.communicate()
+    out = out.decode().lower()
+    if 'winnowmap' not in out or 'options' not in out:
+        return found_winnowmap_path, '-', 'bad'
+    return found_winnowmap_path, racon_or_minimap2_version(found_winnowmap_path), 'good'
+
+
 def racon_or_minimap2_version(tool_path):
     command = [tool_path, '--version']
     process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -185,4 +211,3 @@ def racon_or_minimap2_version(tool_path):
         return out[1:]
     else:
         return out
-

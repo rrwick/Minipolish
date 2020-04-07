@@ -34,7 +34,7 @@ It also takes care of some of the other nuances of polishing a miniasm assembly:
 
 ## Requirements
 
-Minipolish assumes that you have [minimap2](https://github.com/lh3/minimap2) and [Racon](https://github.com/isovic/racon) installed and available in your PATH. If you can run `minimap2 --version` and `racon --version` on the command line, you should be good to go!
+Minipolish assumes that you have [minimap2](https://github.com/lh3/minimap2), [winnowmap](https://github.com/marbl/Winnowmap), [meryl](https://github.com/marbl/meryl), and [Racon](https://github.com/isovic/racon) installed and available in your PATH. If you can run `minimap2 --version`, `winnowmap --version`, `meryl --version`,  and `racon --version` on the command line, you should be good to go!
 
 You'll need Python 3.6 or later to run Minipolish (check with `python3 --version`). The only Python package requirement is [Edlib](https://github.com/Martinsos/edlib/tree/master/bindings/python). If you don't already have this package, it will be installed as part of the Minipolish installation process. You'll also need [pytest](https://docs.pytest.org/en/latest/) if you want to run Minipolish's unit tests.
 
@@ -124,42 +124,47 @@ First use minimap2 and miniasm to make an assembly, then polish it with Minipoli
 ```
 minimap2 -t 8 -x ava-ont long_reads.fastq.gz long_reads.fastq.gz > overlaps.paf
 miniasm -f long_reads.fastq.gz overlaps.paf > assembly.gfa
-minipolish --pacbio no -t 8 long_reads.fastq.gz assembly.gfa > polished.gfa
+minipolish --aligner minimap2 --pacbio no -t 8 long_reads.fastq.gz assembly.gfa > polished.gfa
 ```
 
-This repo contains a small Bash script (`miniasm_and_minipolish.sh`) to do those three steps in a single command. It takes two positional arguments: the long reads file, the number of threads, and overlap/aligner settings (clr, ccs, no):
+This repo contains a small Bash script (`miniasm_and_minipolish.sh`) to do those three steps in a single command. It takes four positional arguments: the long reads file, the number of threads, overlap/aligner settings (clr, ccs, no), and aligner (winnowmap, minimap2):
 ```
-miniasm_and_minipolish.sh long_reads.fastq.gz 8 no > polished.gfa
+miniasm_and_minipolish.sh long_reads.fastq.gz 8 no minimap2 > polished.gfa
 ```
-see `--pacbio` setting below
+see `--pacbio` and `--aligner` settings below
 
 
 
 ## Full usage
 
 ```
-usage: minipolish [-t THREADS] [--rounds ROUNDS] [--pacbio] [-h] [--version] reads assembly
+usage: minipolish [--aligner {minimap2,winnowmap}] [--pacbio {clr,ccs,no}] 
+                  [-t THREADS] [--rounds ROUNDS] [--skip_initial] [-h] [--version]
+                  reads assembly
 
 Minipolish
 
 Positional arguments:
-  reads                          Long reads for polishing (FASTA or FASTQ format)
-  assembly                       Miniasm assembly to be polished (GFA format)
+  reads                           Long reads for polishing (FASTA or FASTQ format)
+  assembly                        Miniasm assembly to be polished (GFA format)
 
 Settings:
-  -t THREADS, --threads THREADS  Number of threads to use for alignment and polishing (default: 12)
-  --rounds ROUNDS                Number of full Racon polishing rounds (default: 2)
-  --pacbio {clr,ccs,no}          Use --pacbio clr for continuous long PacBio reads to make Minipolish
-                                 use the map-pb Minimap2 preset or
-                                 --pacbio ccs for asm20 Minimap2 preset for circular consensus
-                                 sequence reads --pacbio no assumes Nanopore
-                                 reads and uses the map-ont preset)
+  --aligner {minimap2,winnowmap}  Use minimap2 or winnowmap (must be in path) (default: minimap2)
+  --pacbio {clr,ccs,no}           Use --pacbio clr for continuous long PacBio reads to make 
+                                  Minipolish use the map-pb Minimap2 preset or
+                                  --pacbio ccs for asm20 Minimap2 preset for circular consensus
+                                  sequence reads --pacbio no assumes Nanopore
+                                  reads and uses the map-ont preset (default= --pacbio no)
+  -t THREADS, --threads THREADS   Number of threads to use for alignment and polishing (default: 16)
+  --rounds ROUNDS                 Number of full Racon polishing rounds (default: 2)
+  --skip_initial                  Skip the initial polishing round - appropriate if the input
+                                  GFA does not have "a" lines (default: do the
+                                  initial polishing round
 
 Other:
-  -h, --help                     Show this help message and exit
-  --version                      Show program's version number and exit
+  -h, --help                      Show this help message and exit
+  --version                       Show program's version number and exit
 ```
-
 
 
 ## Citation
