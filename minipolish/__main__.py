@@ -24,8 +24,8 @@ from .alignment import Alignment
 from .assembly_graph import load_gfa
 from .help_formatter import MyParser, MyHelpFormatter
 from .log import log, section_header, explanation
-from .misc import iterate_fastq, get_default_thread_count, count_reads, count_fasta_bases, \
-    weighted_average, racon_path_and_version, minimap2_path_and_version
+from .misc import iterate_fastq, iterate_fasta, get_default_thread_count, count_reads, count_fasta_bases, \
+    weighted_average, racon_path_and_version, minimap2_path_and_version, get_sequence_file_type
 from .racon import run_racon
 from .version import __version__
 
@@ -85,9 +85,9 @@ def initial_polish(graph, read_filename, threads, tmp_dir, pacbio):
     explanation('The first round of polishing is done on a per-segment basis and only uses reads '
                 'which are definitely associated with the segment (because the GFA indicated that '
                 'they were used to make the segment).')
-    save_per_segment_reads(graph, read_filename, tmp_dir)
+    extension = save_per_segment_reads(graph, read_filename, tmp_dir)
     for segment in list(graph.segments.values()):
-        seg_read_filename = tmp_dir / (segment.name + '.fastq')
+        seg_read_filename = tmp_dir / (segment.name + extension)
         seg_seq_filename = tmp_dir / (segment.name + '.fasta')
         segment.save_to_fasta(seg_seq_filename)
         fixed_seqs = run_racon(segment.name, seg_read_filename, seg_seq_filename, threads,
@@ -161,14 +161,27 @@ def save_per_segment_reads(graph, read_filename, tmp_dir):
     for segment in graph.segments.values():
         for read_name in segment.read_names:
             read_to_segment[read_name].append(segment.name)
-    for read_name, seq, qual in iterate_fastq(read_filename):
-        if read_name not in read_to_segment:
-            continue
-        for seg_name in read_to_segment[read_name]:
-            seg_read_filename = tmp_dir / (seg_name + '.fastq')
-            with open(seg_read_filename, 'at') as seg_read_file:
-                seg_read_file.write(f'@{read_name}\n{seq}\n+\n{qual}\n')
-
+    if get_sequence_file_type(read_filename) == 'FASTQ':
+        extension = "_reads.fastq"
+        for read_name, seq, qual in iterate_fastq(read_filename):
+            if read_name not in read_to_segment:
+                continue
+            for seg_name in read_to_segment[read_name]:
+                seg_read_filename = tmp_dir / (seg_name + extension)
+                with open(seg_read_filename, 'at') as seg_read_file:
+                    seg_read_file.write(f'@{read_name}\n{seq}\n+\n{qual}\n')
+    elif get_sequence_file_type(read_filename) == 'FASTA':
+        extension = "_reads.fasta"
+        for read_name, seq in iterate_fasta(read_filename):
+            if read_name not in read_to_segment:
+                continue
+            for seg_name in read_to_segment[read_name]:
+                seg_read_filename = tmp_dir / (seg_name + extension)
+                with open(seg_read_filename, 'at') as seg_read_file:
+                    seg_read_file.write(f'>{read_name}\n{seq}\n')
+    else:
+        sys.exit('Error: {} is not FASTA/FASTQ format'.format(read_filename))
+    return extension
 
 def check_for_required_tools():
     section_header('Checking requirements')
