@@ -1,5 +1,7 @@
 <p align="center"><img src="images/logo.png" alt="Minipolish" width="600"></p>
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3752203.svg)](https://doi.org/10.5281/zenodo.3752203)
+
 
 ## Table of contents
 
