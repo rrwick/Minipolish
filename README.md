@@ -139,25 +139,36 @@ miniasm_and_minipolish.sh long_reads.fastq.gz 8 > polished.gfa
 ## Full usage
 
 ```
-usage: minipolish [-t THREADS] [--rounds ROUNDS] [--minimap2-preset {map-ont,map-pb,map-hifi,lr:hq}] [--skip_initial] [-h] [--version] reads assembly
+usage: minipolish [-t THREADS] [--rounds ROUNDS]
+                  [--minimap2-preset {map-ont,lr:hq,map-pb,map-hifi}] [--pacbio]
+                  [--skip_initial] [-h] [--version]
+                  reads assembly
 
 Minipolish
 
 Positional arguments:
-  reads                          Long reads for polishing (FASTA or FASTQ format)
-  assembly                       Miniasm assembly to be polished (GFA format)
+  reads                      Long reads for polishing (FASTA or FASTQ format)
+  assembly                   Miniasm assembly to be polished (GFA format)
 
 Settings:
-  -t, --threads THREADS          Number of threads to use for alignment and polishing (default: 12)
-  --rounds ROUNDS                Number of full Racon polishing rounds (default: 2)
+  -t THREADS, --threads THREADS
+                             Number of threads to use for alignment and polishing
+                             (default: 16)
+  --rounds ROUNDS            Number of full Racon polishing rounds (default: 2)
   --minimap2-preset {map-ont,lr:hq,map-pb,map-hifi}
-                                 Specify the minimap2 preset to use: "map-ont" for Oxford Nanopore reads with <Q20 accuracy, "lr:hq" for Oxford Nanopore reads with Q20+ accuracy, "map-pb" for PacBio CLR, or "map-hifi" for PacBio HiFi/CCS (default: map-ont)
-  --pacbio                       DEPRECATED: Use --minimap2-preset map-pb instead. Included for backwards compatibility. Will force --minimap2-preset="map-pb". (default: False)
-  --skip_initial                 Skip the initial polishing round - appropriate if the input GFA does not have "a" lines (default: do the initial polishing round)
+                             minimap2 preset to use: "map-ont" for Oxford Nanopore
+                             reads with <Q20 accuracy, "lr:hq" for Oxford Nanopore
+                             reads with Q20+ accuracy, "map-pb" for PacBio CLR or
+                             "map-hifi" for PacBio HiFi/CCS (default: map-ont)
+  --pacbio                   Deprecated: equivalent to --minimap2-preset map-pb.
+                             Retained for backwards compatibility.
+  --skip_initial             Skip the initial polishing round - appropriate if the
+                             input GFA does not have "a" lines (default: do the
+                             initial polishing round)
 
 Other:
-  -h, --help                     Show this help message and exit
-  --version                      Show program's version number and exit
+  -h, --help                 Show this help message and exit
+  --version                  Show program's version number and exit
 ```
 
 
