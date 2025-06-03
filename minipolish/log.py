@@ -22,6 +22,10 @@ def log(message='', end='\n'):
     print(message, file=sys.stderr, flush=True, end=end)
 
 
+def warning(message='', end='\n'):
+    print(red(f'Warning: {message}'), file=sys.stderr, flush=True, end=end)
+
+
 def section_header(text):
     log()
     print(bold_yellow_underline(text), file=sys.stderr, flush=True)
@@ -30,6 +34,7 @@ def section_header(text):
 END_FORMATTING = '\033[0m'
 BOLD = '\033[1m'
 UNDERLINE = '\033[4m'
+RED = '\033[31m'
 YELLOW = '\033[93m'
 DIM = '\033[2m'
 
@@ -40,6 +45,10 @@ def bold_yellow_underline(text):
 
 def dim(text):
     return DIM + text + END_FORMATTING
+
+
+def red(text):
+    return RED + text + END_FORMATTING
 
 
 def explanation(text, indent_size=4):

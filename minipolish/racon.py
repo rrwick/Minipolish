@@ -37,7 +37,8 @@ def run_racon(name, read_filename, unpolished_filename, threads, tmp_dir, minima
     log(f'  input:      {unpolished_filename} ({unpolished_base_count:,} bp)')
 
     # Align with minimap2
-    command = ['minimap2', '-t', str(threads), '-x', minimap2_preset, unpolished_filename, read_filename]
+    command = ['minimap2', '-t', str(threads), '-x', minimap2_preset,
+               unpolished_filename, read_filename]
     alignments = tmp_dir / (name + '.paf')
     minimap2_log = tmp_dir / (name + '_minimap2.log')
     with open(alignments, 'wt') as stdout, open(minimap2_log, 'w') as stderr:

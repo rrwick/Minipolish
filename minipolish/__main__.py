@@ -23,7 +23,7 @@ import tempfile
 from .alignment import Alignment
 from .assembly_graph import load_gfa
 from .help_formatter import MyParser, MyHelpFormatter
-from .log import log, section_header, explanation
+from .log import log, warning, section_header, explanation
 from .misc import iterate_fastq, iterate_fasta, get_default_thread_count, count_reads, count_fasta_bases, \
     weighted_average, racon_path_and_version, minimap2_path_and_version, get_sequence_file_type
 from .racon import run_racon
@@ -46,16 +46,13 @@ def get_arguments(args):
                               help='Number of full Racon polishing rounds')
     setting_args.add_argument('--minimap2-preset', type=str, default='map-ont',
                               choices=['map-ont', 'lr:hq', 'map-pb', 'map-hifi'],
-                              help='Specify the minimap2 preset to use: '
+                              help='minimap2 preset to use: '
                                    '"map-ont" for Oxford Nanopore reads with <Q20 accuracy, '
                                    '"lr:hq" for Oxford Nanopore reads with Q20+ accuracy, '
-                                   '"map-pb" for PacBio CLR, '
-                                   'or "map-hifi" for PacBio HiFi/CCS '
-                                   '(default: map-ont)')
+                                   '"map-pb" for PacBio CLR or "map-hifi" for PacBio HiFi/CCS')
     setting_args.add_argument('--pacbio', action='store_true',
-                              help='DEPRECATED: Use --minimap2-preset map-pb instead. '
-                                   'Included for backwards compatibility. '
-                                   'Will force --minimap2-preset="map-pb".')
+                              help='Deprecated: equivalent to --minimap2-preset map-pb. '
+                                   'Retained for backwards compatibility.')
     setting_args.add_argument('--skip_initial', action='store_true',
                               help='Skip the initial polishing round - appropriate if the input '
                                    'GFA does not have "a" lines (default: do the initial '
@@ -69,17 +66,7 @@ def get_arguments(args):
                             help="Show program's version number and exit")
 
     args = parser.parse_args(args)
-
-    # Logic to handle the deprecated --pacbio
-    if args.pacbio:
-        # raise error if minimap2_preset is different from default
-        if args.minimap2_preset != 'map-ont':
-            parser.error("Cannot use both --pacbio and explicitly set a different --minimap2-preset. "
-                         "Please use only --minimap2-preset.")
-        print("\033[91mWarning: --pacbio is deprecated. Using --minimap2-preset map-pb for backwards compatibility.",
-              "Will now overwrite --minimap2-preset to 'map-pb'.\033[0m", file=sys.stderr)
-        args.minimap2_preset = 'map-pb'
-
+    check_args(args)
     return args
 
 
@@ -224,6 +211,17 @@ def check_for_required_tools():
         sys.exit('Error: unable to determine Racon version')
 
     log()
+
+
+def check_args(args):
+    if args.pacbio:
+        if '--minimap2-preset' in str(sys.argv):
+            sys.exit('Error: cannot use both --pacbio and --minimap2-preset.')
+        log()
+        warning('--pacbio is deprecated. Using --minimap2-preset map-pb for backwards '
+                'compatibility.')
+        log()
+        args.minimap2_preset = 'map-pb'
 
 
 if __name__ == '__main__':

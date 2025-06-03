@@ -52,7 +52,9 @@ class MyHelpFormatter(argparse.HelpFormatter):
         Override this function to add default values, but only when 'default' is not already in the
         help text.
         """
-        help_text = action.help
+        help_text = action.help or ''
+        if isinstance(action, (argparse._StoreTrueAction, argparse._StoreFalseAction)):
+            return help_text
         if action.default != argparse.SUPPRESS and action.default is not None:
             if 'default' not in help_text.lower():
                 help_text += ' (default: {})'.format(action.default)
