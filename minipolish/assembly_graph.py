@@ -85,6 +85,9 @@ class AssemblyGraph(object):
     def get_segment_length(self, seg_name):
         return self.segments[seg_name].get_length()
 
+    def get_total_length(self):
+        return sum(seg.get_length() for seg in self.segments.values())
+
     def build_reverse_links(self):
         """
         Each link in the graph (e.g. utg000001l+ -> utg000002l-) should have a corresponding link

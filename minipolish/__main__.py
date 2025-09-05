@@ -106,6 +106,8 @@ def initial_polish(graph, read_filename, threads, tmp_dir, minimap2_preset):
             segment.sequence = fixed_seq
         else:
             graph.remove_segment(segment.name)
+    if graph.get_total_length() == 0:
+        sys.exit('Error: all segments were removed during initial polishing')
     log()
 
 
@@ -140,7 +142,9 @@ def assign_depths(graph, read_filename, threads, tmp_dir, minimap2_preset):
     alignments_filename = tmp_dir / 'depths.paf'
     minimap2_log = tmp_dir / 'depths_minimap2.log'
     with open(alignments_filename, 'wt') as stdout, open(minimap2_log, 'w') as stderr:
-        subprocess.call(command, stdout=stdout, stderr=stderr)
+        rc = subprocess.call(command, stdout=stdout, stderr=stderr)
+    if rc != 0:
+        sys.exit('Error: minimap2 failed')
 
     alignments = []
     with open(alignments_filename, 'rt') as alignments_file:

@@ -14,6 +14,7 @@ If not, see <http://www.gnu.org/licenses/>.
 
 import edlib
 import subprocess
+import sys
 
 from .log import log
 from .misc import count_reads, load_fasta, count_fasta_bases, count_lines
@@ -42,7 +43,9 @@ def run_racon(name, read_filename, unpolished_filename, threads, tmp_dir, minima
     alignments = tmp_dir / (name + '.paf')
     minimap2_log = tmp_dir / (name + '_minimap2.log')
     with open(alignments, 'wt') as stdout, open(minimap2_log, 'w') as stderr:
-        subprocess.call(command, stdout=stdout, stderr=stderr)
+        rc = subprocess.call(command, stdout=stdout, stderr=stderr)
+    if rc != 0:
+        sys.exit('Error: minimap2 failed')
     alignment_count = count_lines(alignments)
     log(f'  alignments: {alignments} ({alignment_count:,} alignments)')
 
@@ -51,7 +54,9 @@ def run_racon(name, read_filename, unpolished_filename, threads, tmp_dir, minima
     command = ['racon', '-t', str(threads), read_filename, str(alignments), unpolished_filename]
     racon_log = tmp_dir / (name + '_racon.log')
     with open(polished_filename, 'wt') as stdout, open(racon_log, 'w') as stderr:
-        subprocess.call(command, stdout=stdout, stderr=stderr)
+        rc = subprocess.call(command, stdout=stdout, stderr=stderr)
+    if rc != 0:
+        sys.exit('Error: racon failed')
     polished_base_count = count_fasta_bases(polished_filename)
     log(f'  output:     {polished_filename} ({polished_base_count:,} bp)')
 
