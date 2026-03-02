@@ -81,7 +81,7 @@ If you run Minipolish this way, it's up to you to make sure that [Edlib](https:/
 
 ### Step 1: initial Racon polish with constituent reads
 
-Miniasm's assembled contigs are made up of pieces of long reads and therefore has a high error rate – probably around 90% or so, depending on the input reads.
+Miniasm's assembled contigs are made up of pieces of long reads and therefore have a high error rate – probably around 90% or so, depending on the input reads.
 
 The miniasm GFA file indicates specifically which reads contributed to each contig on the `a` lines. For example:
 ```
@@ -91,14 +91,14 @@ a       utg000001c      35942   668e8adb-6b7d-67ba-684f-44d78fc3fe32:85-164862  
 a       utg000001c      50880   0ed28b14-d384-ee7b-d12f-88512a2a829c:43-218068  +       81190
 ```
 
-Therefore, the first thing Minipolish does is to run Racon on each contig independently, only using the reads which were used to create that contig. This step typically quite fast because it does not involve high read depths, and it can bring the percent identity up to the high 90s.
+Therefore, the first thing Minipolish does is to run Racon on each contig independently, only using the reads which were used to create that contig. This step is typically quite fast because it does not involve high read depths, and it can bring the percent identity up to the high 90s.
 
 
 ### Step 2: full Racon polish rounds
 
 Now that the assembly is in better shape, Minipolish does full Racon-polishing rounds – aligning the full read set to the whole assembly and getting a Racon consensus. The default number of polishing rounds is two, but this is configurable with the `--rounds` option.
 
-Minipolish does two things here to ensure that contigs can circularise cleanly. First, it repairs sequence ends as Racon can sometimes truncate them. I.e. if Racon dropped a handful of bases from the start or end of a contig, Minipolish will put them back on. Second, it rotates (i.e. changes the starting position) of circular contigs between polishing rounds. If all goes well, this means that the first base of a circular contig immediately follows the last base – clean circularisation.
+Minipolish does two things here to ensure that contigs can circularise cleanly. First, it repairs sequence ends as Racon can sometimes truncate them. I.e. if Racon dropped a handful of bases from the start or end of a contig, Minipolish will put them back on. Second, it rotates (i.e. changes the starting position) circular contigs between polishing rounds. If all goes well, this means that the first base of a circular contig immediately follows the last base – clean circularisation.
 
 
 ### Step 3: contig read depth

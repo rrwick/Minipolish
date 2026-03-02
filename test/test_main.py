@@ -19,6 +19,7 @@ import tempfile
 
 import minipolish.__main__
 import minipolish.assembly_graph
+import pytest
 
 
 def test_initial_polish_skips_when_no_a_lines():
@@ -32,3 +33,17 @@ def test_initial_polish_skips_when_no_a_lines():
         minipolish.__main__.initial_polish(graph, reads_filename, 1, tmp_dir, 'map-ont')
     assert sorted(graph.segments.keys()) == ['utg000001l']
     assert graph.segments['utg000001l'].sequence == 'ACGTACGT'
+
+
+def test_pacbio_and_minimap2_preset_are_mutually_exclusive():
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_dir = pathlib.Path(tmp_dir)
+        gfa_filename = tmp_dir / 'assembly.gfa'
+        reads_filename = tmp_dir / 'reads.fastq'
+        gfa_filename.write_text('S\tutg000001l\tACGTACGT\n')
+        reads_filename.write_text('@read_1\nACGT\n+\nIIII\n')
+        with pytest.raises(SystemExit) as e:
+            minipolish.__main__.get_arguments(['--pacbio', '--minimap2-preset', 'map-hifi',
+                                               str(reads_filename), str(gfa_filename)])
+    assert e.type == SystemExit
+    assert e.value.code != 0

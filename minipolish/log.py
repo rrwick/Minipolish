@@ -1,5 +1,5 @@
 """
-This module contains a class for writing output to both stdout and a log file.
+This module contains functions for writing output to stderr.
 
 Copyright 2019 Ryan Wick (rrwick@gmail.com)
 https://github.com/rrwick/Minipolish
@@ -53,8 +53,7 @@ def red(text):
 
 def explanation(text, indent_size=4):
     """
-    This function writes explanatory text to the screen. It is wrapped to the terminal width for
-    stdout but not wrapped for the log file.
+    This function writes explanatory text to stderr, wrapping to the terminal width.
     """
     text = ' ' * indent_size + text
     terminal_width, _ = get_terminal_size_stderr()

@@ -44,15 +44,16 @@ def get_arguments(args):
                               help='Number of threads to use for alignment and polishing')
     setting_args.add_argument('--rounds', type=int, default=2,
                               help='Number of full Racon polishing rounds')
-    setting_args.add_argument('--minimap2-preset', type=str, default='map-ont',
-                              choices=['map-ont', 'lr:hq', 'map-pb', 'map-hifi'],
-                              help='minimap2 preset to use: '
-                                   '"map-ont" for Oxford Nanopore reads with <Q20 accuracy, '
-                                   '"lr:hq" for Oxford Nanopore reads with Q20+ accuracy, '
-                                   '"map-pb" for PacBio CLR or "map-hifi" for PacBio HiFi/CCS')
-    setting_args.add_argument('--pacbio', action='store_true',
-                              help='Deprecated: equivalent to --minimap2-preset map-pb. '
-                                   'Retained for backwards compatibility.')
+    minimap_settings = setting_args.add_mutually_exclusive_group()
+    minimap_settings.add_argument('--minimap2-preset', type=str, default='map-ont',
+                                  choices=['map-ont', 'lr:hq', 'map-pb', 'map-hifi'],
+                                  help='minimap2 preset to use: '
+                                       '"map-ont" for Oxford Nanopore reads with <Q20 accuracy, '
+                                       '"lr:hq" for Oxford Nanopore reads with Q20+ accuracy, '
+                                       '"map-pb" for PacBio CLR or "map-hifi" for PacBio HiFi/CCS')
+    minimap_settings.add_argument('--pacbio', action='store_true',
+                                  help='Deprecated: equivalent to --minimap2-preset map-pb. '
+                                       'Retained for backwards compatibility.')
     setting_args.add_argument('--skip_initial', action='store_true',
                               help='Skip the initial polishing round - appropriate if the input '
                                    'GFA does not have "a" lines (default: do the initial '
@@ -233,8 +234,6 @@ def check_args(args):
     if not pathlib.Path(args.assembly).is_file():
         sys.exit(f'Error: assembly file {args.assembly} not found')
     if args.pacbio:
-        if '--minimap2-preset' in str(sys.argv):
-            sys.exit('Error: cannot use both --pacbio and --minimap2-preset.')
         log()
         warning('--pacbio is deprecated. Using --minimap2-preset map-pb for backwards '
                 'compatibility.')

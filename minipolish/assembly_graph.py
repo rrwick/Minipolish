@@ -91,7 +91,8 @@ class AssemblyGraph(object):
     def build_reverse_links(self):
         """
         Each link in the graph (e.g. utg000001l+ -> utg000002l-) should have a corresponding link
-        in the other direction (utg000002l+ -> utg000001l-). This function
+        in the other direction (utg000002l+ -> utg000001l-). This function will build those
+        corresponding links if they don't already exist.
         """
         # Group links into their pairs.
         str_to_links = collections.defaultdict(list)
@@ -115,7 +116,7 @@ class AssemblyGraph(object):
         """
         Any circular contig (i.e. ends with 'c') should have a circularising link with no overlap
         (e.g. utg000001c+ -> utg000001c+ 0M). This function will build those links (in both
-        directions if they don't already exist.
+        directions) if they don't already exist.
         """
         segment_names = sorted(self.segments.keys())
         for name in segment_names:

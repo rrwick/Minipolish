@@ -65,6 +65,17 @@ def test_load_fasta():
     assert seqs[1] == ('read_2', 'GGCGCTCG')
 
 
+def test_iterate_fasta():
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        temp_filename = str(pathlib.Path(tmp_dir) / 'test.fasta')
+        with open(temp_filename, 'wt') as temp_fasta:
+            temp_fasta.write('>read_1\nACGAT\nCGACT\n')
+            temp_fasta.write('>read_2 extra stuff\nGGCGC\nTCG\n')
+        seqs = list(minipolish.misc.iterate_fasta(temp_filename))
+    assert seqs[0] == ('read_1', 'ACGATCGACT')
+    assert seqs[1] == ('read_2', 'GGCGCTCG')
+
+
 def test_count_lines():
     with tempfile.TemporaryDirectory() as tmp_dir:
         temp_filename = str(pathlib.Path(tmp_dir) / 'test.txt')

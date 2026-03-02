@@ -94,16 +94,27 @@ def iterate_fastq(filename):
 def iterate_fasta(filename):
     if get_sequence_file_type(filename) != 'FASTA':
         sys.exit('Error: {} is not FASTA format'.format(filename))
-    with get_open_func(filename)(filename, 'rt') as fasta:
-        for line in fasta:
+    with get_open_func(filename)(filename, 'rt') as fasta_file:
+        name = ''
+        sequence = []
+        for line in fasta_file:
             line = line.strip()
-            if len(line) == 0:
+            if not line:
                 continue
-            if not line.startswith('>'):
-                continue
-            name = line[1:].split()[0]
-            sequence = next(fasta).strip()
-            yield name, sequence
+            if line[0] == '>':  # Header line = start of new contig
+                if name:
+                    name_parts = name.split(maxsplit=1)
+                    contig_name = name_parts[0]
+                    yield contig_name, ''.join(sequence)
+                    sequence = []
+                name = line[1:]
+            else:
+                sequence.append(line.upper())
+        if name:
+            name_parts = name.split(maxsplit=1)
+            contig_name = name_parts[0]
+            yield contig_name, ''.join(sequence)
+
 
 def count_reads(filename):
     count = 0
@@ -116,6 +127,7 @@ def count_reads(filename):
     else:
         sys.exit('Error: {} is not FASTA/FASTQ format'.format(filename))
     return count
+
 
 def load_fasta(fasta_filename):
     if get_compression_type(fasta_filename) == 'gz':
