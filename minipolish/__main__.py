@@ -82,7 +82,6 @@ def main(args=None):
         if args.rounds > 0:
             full_polish(graph, args.reads, args.threads, args.rounds, tmp_dir, args.minimap2_preset)
         assign_depths(graph, args.reads, args.threads, tmp_dir, args.minimap2_preset)
-    # TODO (maybe): add a step here to recalculate the overlaps between segments
     graph.print_to_stdout()
 
 
@@ -91,9 +90,17 @@ def initial_polish(graph, read_filename, threads, tmp_dir, minimap2_preset):
     explanation('The first round of polishing is done on a per-segment basis and only uses reads '
                 'which are definitely associated with the segment (because the GFA indicated that '
                 'they were used to make the segment).')
-    extension = save_per_segment_reads(graph, read_filename, tmp_dir)
+    extension, read_count = save_per_segment_reads(graph, read_filename, tmp_dir)
+    if read_count == 0:
+        warning('No matching per-segment reads ("a" lines) were found in the GFA. Skipping '
+                'initial polishing round. Use --skip_initial to suppress this warning.')
+        log()
+        return
     for segment in list(graph.segments.values()):
         seg_read_filename = tmp_dir / (segment.name + extension)
+        if not seg_read_filename.is_file():
+            warning(f'No per-segment reads found for {segment.name}. Keeping original sequence.')
+            continue
         seg_seq_filename = tmp_dir / (segment.name + '.fasta')
         segment.save_to_fasta(seg_seq_filename)
         fixed_seqs = run_racon(segment.name, seg_read_filename, seg_seq_filename, threads,
@@ -167,6 +174,7 @@ def assign_depths(graph, read_filename, threads, tmp_dir, minimap2_preset):
 
 def save_per_segment_reads(graph, read_filename, tmp_dir):
     read_to_segment = collections.defaultdict(list)
+    read_count = 0
     for segment in graph.segments.values():
         for read_name in segment.read_names:
             read_to_segment[read_name].append(segment.name)
@@ -179,6 +187,7 @@ def save_per_segment_reads(graph, read_filename, tmp_dir):
                 seg_read_filename = tmp_dir / (seg_name + extension)
                 with open(seg_read_filename, 'at') as seg_read_file:
                     seg_read_file.write(f'@{read_name}\n{seq}\n+\n{qual}\n')
+                    read_count += 1
     elif get_sequence_file_type(read_filename) == 'FASTA':
         extension = "_reads.fasta"
         for read_name, seq in iterate_fasta(read_filename):
@@ -188,9 +197,10 @@ def save_per_segment_reads(graph, read_filename, tmp_dir):
                 seg_read_filename = tmp_dir / (seg_name + extension)
                 with open(seg_read_filename, 'at') as seg_read_file:
                     seg_read_file.write(f'>{read_name}\n{seq}\n')
+                    read_count += 1
     else:
         sys.exit('Error: {} is not FASTA/FASTQ format'.format(read_filename))
-    return extension
+    return extension, read_count
 
 
 def check_for_required_tools():
@@ -218,6 +228,10 @@ def check_for_required_tools():
 
 
 def check_args(args):
+    if not pathlib.Path(args.reads).is_file():
+        sys.exit(f'Error: reads file {args.reads} not found')
+    if not pathlib.Path(args.assembly).is_file():
+        sys.exit(f'Error: assembly file {args.assembly} not found')
     if args.pacbio:
         if '--minimap2-preset' in str(sys.argv):
             sys.exit('Error: cannot use both --pacbio and --minimap2-preset.')

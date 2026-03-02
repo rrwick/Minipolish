@@ -14,8 +14,12 @@ details. You should have received a copy of the GNU General Public License along
 If not, see <http://www.gnu.org/licenses/>.
 """
 
+import pathlib
+import tempfile
+
 import minipolish.racon
 import minipolish.misc
+import pytest
 
 
 def load_seq(name):
@@ -54,3 +58,33 @@ def test_fix_ends_4():
     fixed_seq = load_seq('test_4_fixed')
     result = minipolish.racon.fix_sequence_ends_one_pair(before_seq, after_seq)
     assert result == fixed_seq
+
+
+def test_run_racon_one_read_exits_on_no_alignments(monkeypatch):
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_dir = pathlib.Path(tmp_dir)
+        read_filename = tmp_dir / 'reads.fastq'
+        unpolished_filename = tmp_dir / 'segment.fasta'
+        read_filename.write_text('@read_1\nACGT\n+\nIIII\n')
+        unpolished_filename.write_text('>segment\nACGTACGT\n')
+        monkeypatch.setattr(minipolish.racon.subprocess, 'call', lambda *args, **kwargs: 0)
+        with pytest.raises(SystemExit) as e:
+            minipolish.racon.run_racon('segment', read_filename, unpolished_filename, 1,
+                                       tmp_dir, 'map-ont')
+    assert e.type == SystemExit
+    assert 'produced no alignments' in str(e.value)
+
+
+def test_run_racon_no_alignments_exits(monkeypatch):
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_dir = pathlib.Path(tmp_dir)
+        read_filename = tmp_dir / 'reads.fastq'
+        unpolished_filename = tmp_dir / 'segment.fasta'
+        read_filename.write_text('@read_1\nACGT\n+\nIIII\n@read_2\nTGCA\n+\nIIII\n')
+        unpolished_filename.write_text('>segment\nACGTACGT\n')
+        monkeypatch.setattr(minipolish.racon.subprocess, 'call', lambda *args, **kwargs: 0)
+        with pytest.raises(SystemExit) as e:
+            minipolish.racon.run_racon('segment', read_filename, unpolished_filename, 1,
+                                       tmp_dir, 'map-ont')
+    assert e.type == SystemExit
+    assert 'produced no alignments' in str(e.value)

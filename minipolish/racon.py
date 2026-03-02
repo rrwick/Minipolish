@@ -27,9 +27,9 @@ def run_racon(name, read_filename, unpolished_filename, threads, tmp_dir, minima
     if name is None:
         name = unpolished_filename
     read_count = count_reads(read_filename)
-    if read_count <= 1:
+    if read_count < 1:
         log(f'Skipping Racon for {name} (not enough reads)')
-        return {}
+        return get_unpolished_sequences(unpolished_filename)
 
     log(f'Running Racon on {name}:')
     log(f'  reads:      {read_filename} ({read_count:,} reads)')
@@ -48,6 +48,8 @@ def run_racon(name, read_filename, unpolished_filename, threads, tmp_dir, minima
         sys.exit('Error: minimap2 failed')
     alignment_count = count_lines(alignments)
     log(f'  alignments: {alignments} ({alignment_count:,} alignments)')
+    if alignment_count == 0:
+        sys.exit(f'\nError: minimap2 produced no alignments for {name}.')
 
     # Polish with Racon
     polished_filename = tmp_dir / (name + '_polished.fasta')
@@ -59,6 +61,8 @@ def run_racon(name, read_filename, unpolished_filename, threads, tmp_dir, minima
         sys.exit('Error: racon failed')
     polished_base_count = count_fasta_bases(polished_filename)
     log(f'  output:     {polished_filename} ({polished_base_count:,} bp)')
+    if polished_base_count == 0:
+        sys.exit(f'\nError: Racon produced an empty output for {name}.')
 
     fixed_seqs = fix_sequence_ends(unpolished_filename, polished_filename)
     fixed_base_count = sum(len(seq) for seq in fixed_seqs.values())
@@ -114,3 +118,7 @@ def fix_sequence_ends_one_pair(before_seq, after_seq):
     additional_end_seq = before_end[end_pos:]
 
     return additional_start_seq + after_seq + additional_end_seq
+
+
+def get_unpolished_sequences(unpolished_filename):
+    return {name: seq for name, seq in load_fasta(unpolished_filename)}
